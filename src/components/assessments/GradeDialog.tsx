@@ -1,0 +1,107 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { useAppStore } from "@/store/app";
+import type { Assessment } from "@/types";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { Input, FieldShell } from "@/components/ui/Field";
+
+export interface GradeDialogProps {
+  open: boolean;
+  onClose: () => void;
+  assessment?: Assessment | null;
+}
+
+export function GradeDialog({ open, onClose, assessment }: GradeDialogProps) {
+  const setGrade = useAppStore((s) => s.setGrade);
+  const grades = useAppStore((s) => s.grades);
+
+  const existing = assessment
+    ? grades.find((g) => g.assessmentId === assessment.id)
+    : undefined;
+  const [score, setScore] = useState("");
+  const [note, setNote] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    setScore(existing ? String(existing.score) : "");
+    setNote(existing?.note ?? "");
+    setErrors({});
+  }, [open, assessment, existing]);
+
+  if (!assessment) return null;
+
+  if (!assessment) return null;
+  const a = assessment;
+
+  const grade = existing?.score;
+  const needs = grade === undefined ? 0 : Math.max(0, 100 - grade);
+
+  function submit() {
+    const value = Number(score);
+    if (score === "" || !Number.isFinite(value) || value < 0 || value > 100) {
+      setErrors({ score: "Ingresa una nota entre 0 y 100" });
+      return;
+    }
+    setGrade(a.id, a.courseId, value, note.trim());
+    onClose();
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={`Calificar: ${a.name}`}
+      description={`Peso ${a.weight}% de la materia.`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={submit}>
+            {existing ? "Actualizar nota" : "Guardar nota"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <FieldShell
+          label={`Nota (0–100)${grade !== undefined ? ` · actual: ${grade}` : ""}`}
+          htmlFor="g-score"
+          error={errors.score}
+        >
+          <div className="flex items-center gap-3">
+            <Input
+              id="g-score"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={100}
+              step="0.5"
+              value={score}
+              onChange={(e) => setScore(e.target.value)}
+              className="w-28 text-lg font-semibold tabular-nums"
+            />
+            {grade !== undefined ? (
+              <span className="text-[13px] text-text-muted">
+                Faltan <span className="font-semibold text-pending">{needs.toFixed(1)}</span> pts
+              </span>
+            ) : null}
+          </div>
+        </FieldShell>
+        <FieldShell label="Comentario" htmlFor="g-note">
+          <Input
+            id="g-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Dificultad media, revisa el tema 4"
+          />
+        </FieldShell>
+      </div>
+    </Dialog>
+  );
+}
