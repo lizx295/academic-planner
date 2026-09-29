@@ -112,6 +112,19 @@ function stripHtml(value: string | null | undefined): string {
     .slice(0, 2000);
 }
 
+function cleanCanvasLabel(value: string | null | undefined): string {
+  const source = stripHtml(value);
+  const boldLabels = [...source.matchAll(/\\textbf\{([^{}]+)\}/g)].map((match) => match[1].trim());
+  if (boldLabels.length > 0) return boldLabels.join(" · ");
+  return source
+    .replace(/\\(?:Large|large|small|displaystyle)\b/g, " ")
+    .replace(/\\color\{[^{}]*\}/g, " ")
+    .replace(/\\[()\[\]]/g, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function assignmentKind(assignment: CanvasAssignment): AssessmentKind {
   const text = `${assignment.name ?? ""} ${assignment.submission_types?.join(" ") ?? ""}`.toLowerCase();
   if (text.includes("quiz") || text.includes("examen") || text.includes("exam")) return "quiz";
@@ -210,7 +223,7 @@ function assignmentWeights(
       const groupWeight = Math.max(0, group?.group_weight ?? 0);
       result.set(assignment.id, {
         weight: Math.round(groupWeight * share * 100) / 100,
-        ...(group?.name ? { groupName: group.name.trim() } : {}),
+        ...(group?.name ? { groupName: cleanCanvasLabel(group.name) } : {}),
         groupWeight,
       });
     }
@@ -226,7 +239,7 @@ function assignmentWeights(
       weight: totalPoints > 0
         ? Math.round(((assignment.points_possible ?? 0) / totalPoints) * 10_000) / 100
         : 0,
-      ...(group?.name ? { groupName: group.name.trim() } : {}),
+      ...(group?.name ? { groupName: cleanCanvasLabel(group.name) } : {}),
       ...(group?.group_weight != null ? { groupWeight: Math.max(0, group.group_weight) } : {}),
     });
   }

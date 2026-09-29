@@ -587,6 +587,21 @@ export default function CourseDetailPage() {
                   ))}
                 </div>
               </Card>
+            ) : course.source === "canvas" && courseAssessments.length > 0 ? (
+              <Card className="p-4">
+                <CardHeader
+                  title="Ponderaciones pendientes"
+                  description="Estas evaluaciones se guardaron antes de descargar las categorías de Canvas. Sincroniza nuevamente para obtenerlas."
+                  action={
+                    <Link
+                      href="/settings"
+                      className="inline-flex items-center rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-accent-soft"
+                    >
+                      Sincronizar Canvas
+                    </Link>
+                  }
+                />
+              </Card>
             ) : null}
             <Card className="divide-y divide-border">
               {gradedDown.length === 0 ? (
@@ -615,7 +630,12 @@ export default function CourseDetailPage() {
                       </progress>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-text">{a.name}</p>
-                        <p className="text-xs text-text-muted">Peso {a.weight}%</p>
+                        <p className="text-xs text-text-muted">
+                          Peso efectivo {Number(a.weight.toFixed(2))}%
+                          {a.gradingGroupName
+                            ? ` · ${a.gradingGroupName}${a.gradingGroupWeight != null ? ` ${Number(a.gradingGroupWeight.toFixed(2))}%` : ""}`
+                            : ""}
+                        </p>
                       </div>
                       <span className="text-lg font-semibold tabular-nums text-text">{score}</span>
                     </button>
