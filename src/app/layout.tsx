@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { InlineScript } from "@/components/providers/InlineScript";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -54,10 +55,8 @@ export default function RootLayout({
     >
       <head>
         {/* Aplica el tema guardado antes de la hidratación para evitar parpadeo. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('academic-planner-store');var t=s?JSON.parse(s).state.theme:null;var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()`,
-          }}
+        <InlineScript
+          html={`(function(){try{var s=localStorage.getItem('academic-planner-store');var t=s?JSON.parse(s).state.theme:null;var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()`}
         />
       </head>
       <body>

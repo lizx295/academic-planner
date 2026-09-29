@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { useAppStore } from "@/store/app";
 import type { ThemePreference } from "@/types";
@@ -34,6 +34,19 @@ export function useTheme() {
   return { theme, setTheme };
 }
 
+/** Tema resuelto sin producir diferencias entre SSR y la primera hidratación. */
+export function useResolvedDark(theme: ThemePreference): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () => resolveTheme(theme) === "dark",
+    () => false,
+  );
+}
+
 /** Reloj vivo para countdowns. */
 export function useNow(intervalMs = 30_000): Date {
   const [now, setNow] = useState(() => new Date());
@@ -46,7 +59,9 @@ export function useNow(intervalMs = 30_000): Date {
 
 /** `true` solo después del montaje en el cliente (para texto ·reloj·). */
 export function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted;
+  return useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 }

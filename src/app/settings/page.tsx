@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { useAppStore } from "@/store/app";
-import { resolveTheme, useTheme } from "@/hooks/useTheme";
+import { useResolvedDark, useTheme } from "@/hooks/useTheme";
 import type { ThemePreference } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -35,7 +35,7 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const resolved = resolveTheme(theme);
+  const resolved = useResolvedDark(theme) ? "dark" : "light";
   const profile = useAppStore((s) => s.profile);
   const updateProfile = useAppStore((s) => s.updateProfile);
   const semesters = useAppStore((s) => s.semesters);

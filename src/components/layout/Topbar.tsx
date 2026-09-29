@@ -16,7 +16,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
 import { IconButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { applyThemeClass, useTheme } from "@/hooks/useTheme";
+import { applyThemeClass, useResolvedDark, useTheme } from "@/hooks/useTheme";
 import { fmtRelativeIn } from "@/lib/format";
 import { pageTitleFor } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -147,7 +147,7 @@ function NotificationBell() {
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const dark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark = useResolvedDark(theme);
   const toggle = () => {
     const next = dark ? "light" : "dark";
     setTheme(next);
