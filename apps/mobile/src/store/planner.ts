@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import {
   mergeCanvasSync,
+  upgradeCanvasCourseSections,
   type CanvasSyncPayload,
   type PlannerSnapshot,
 } from "@academic-planner/core";
@@ -58,7 +59,11 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
   initialize: async () => {
     try {
       const cached = await AsyncStorage.getItem(STORAGE_KEY);
-      if (cached) set({ snapshot: JSON.parse(cached) as PlannerSnapshot });
+      if (cached) {
+        const snapshot = upgradeCanvasCourseSections(JSON.parse(cached) as PlannerSnapshot);
+        set({ snapshot });
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      }
       const supabase = getSupabaseClient();
       if (!supabase) {
         set({ ready: true, cloudStatus: "local", cloudMessage: "Configura Supabase para activar el respaldo." });
@@ -81,7 +86,7 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
         .maybeSingle();
       if (remote.error) throw remote.error;
       if (remote.data?.state) {
-        const snapshot = remote.data.state as PlannerSnapshot;
+        const snapshot = upgradeCanvasCourseSections(remote.data.state as PlannerSnapshot);
         set({ snapshot });
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
       } else {

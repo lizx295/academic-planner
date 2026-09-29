@@ -61,12 +61,14 @@ export function UpcomingAssessments() {
                       <span className="block truncate text-sm font-medium text-text">{a.name}</span>
                       <span className="mt-0.5 block truncate text-xs text-text-muted">{a.courseName}</span>
                     </span>
-                    <span className="shrink-0 text-[13px] tabular text-text-faint">
-                      {format(new Date(`${a.date}T00:00:00`), "d MMM", { locale: es })}
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-[12px] tabular text-text-faint">
+                        {format(new Date(`${a.date}T00:00:00`), "d MMM", { locale: es })}
+                      </span>
+                      <Badge tone={diff <= 7 ? "warning" : "neutral"}>
+                        {diff === 0 ? "Hoy" : diff === 1 ? "Mañana" : `en ${diff} d`}
+                      </Badge>
                     </span>
-                    <Badge tone={diff <= 7 ? "warning" : "neutral"}>
-                      {diff === 0 ? "Hoy" : diff === 1 ? "Mañana" : `en ${diff} d`}
-                    </Badge>
                   </Link>
                 </li>
               );

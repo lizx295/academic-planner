@@ -133,7 +133,9 @@ function sectionKind(course: CanvasCourse): CourseSectionKind {
 
 function withoutSection(value: string | undefined): string {
   return (value ?? "")
+    .replace(/\bparalelo\s+(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)(?:\s+[A-Z0-9]{1,3})?\b/gi, " ")
     .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b\s*[)\]]?/gi, " ")
+    .replace(/\bparalelo(?:\s+[A-Z0-9]+)?\b/gi, " ")
     .replace(/\s*[-–—|/]\s*[TP]\s*$/i, "")
     .replace(/\s*[-–—|/]\s*$/g, "")
     .replace(/\s{2,}/g, " ")
@@ -209,13 +211,21 @@ export function normalizeCanvasData(
   const courseIdByCanvasId = new Map<number, string>();
   const courses: Course[] = [...grouped.values()].map((group, index) => {
     const kindsSeen = new Map<CourseSectionKind, number>();
+    const detectedKinds = group.raw.map(sectionKind);
+    const inferKind = (course: CanvasCourse): CourseSectionKind => {
+      const detected = sectionKind(course);
+      if (detected === "other" && detectedKinds.includes("practice") && !detectedKinds.includes("theory")) {
+        return "theory";
+      }
+      return detected;
+    };
     const sections: CourseSection[] = group.raw
       .sort((a, b) => {
         const order = { theory: 0, practice: 1, other: 2 };
-        return order[sectionKind(a)] - order[sectionKind(b)] || a.id - b.id;
+        return order[inferKind(a)] - order[inferKind(b)] || a.id - b.id;
       })
       .map((course) => {
-        const kind = sectionKind(course);
+        const kind = inferKind(course);
         const occurrence = (kindsSeen.get(kind) ?? 0) + 1;
         kindsSeen.set(kind, occurrence);
         const baseLabel = sectionLabel(kind);

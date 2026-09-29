@@ -5,7 +5,7 @@ import { addDays, format, isSameDay, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { EVENT_META } from "@/lib/colors";
-import { monthWeeks, weekDays, type EventSource } from "@/lib/calendar";
+import { monthWeeks, type EventSource } from "@/lib/calendar";
 import { materializeEvents } from "@/lib/calendar";
 import { timeToMinutes, minutesToTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -18,27 +18,44 @@ interface Placed extends CalendarEvent {
   total: number;
 }
 
-function placeEvents(events: CalendarEvent[]): Placed[] {
+export function placeEvents(events: CalendarEvent[]): Placed[] {
   const sorted = [...events].sort(
     (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end),
   );
-  const active: Array<{ col: number; end: number }> = [];
   const placed: Placed[] = [];
 
-  for (const ev of sorted) {
-    const start = timeToMinutes(ev.start);
-    const end = Math.max(timeToMinutes(ev.end), start + 30);
-    for (let i = active.length - 1; i >= 0; i--) {
-      if (active[i].end <= start) active.splice(i, 1);
+  type Interval = { event: CalendarEvent; start: number; end: number };
+  let group: Interval[] = [];
+  let groupEnd = -1;
+
+  function flushGroup() {
+    if (group.length === 0) return;
+    const active: Array<{ col: number; end: number }> = [];
+    const groupPlaced: Array<{ event: CalendarEvent; col: number }> = [];
+    let total = 1;
+    for (const item of group) {
+      for (let i = active.length - 1; i >= 0; i--) {
+        if (active[i].end <= item.start) active.splice(i, 1);
+      }
+      const used = new Set(active.map((entry) => entry.col));
+      let col = 0;
+      while (used.has(col)) col += 1;
+      active.push({ col, end: item.end });
+      total = Math.max(total, col + 1);
+      groupPlaced.push({ event: item.event, col });
     }
-    let col = 0;
-    const used = new Set(active.map((a) => a.col));
-    while (used.has(col)) col++;
-    const maxCol = active.length > 0 ? Math.max(...active.map((a) => a.col)) : col;
-    const total = Math.max(maxCol, col) + 1;
-    placed.push({ ...ev, col, total });
-    active.push({ col, end });
+    placed.push(...groupPlaced.map(({ event, col }) => ({ ...event, col, total })));
+    group = [];
   }
+
+  for (const event of sorted) {
+    const start = timeToMinutes(event.start);
+    const end = Math.max(timeToMinutes(event.end), start + 30);
+    if (group.length > 0 && start >= groupEnd) flushGroup();
+    group.push({ event, start, end });
+    groupEnd = Math.max(groupEnd, end);
+  }
+  flushGroup();
   return placed;
 }
 
@@ -258,7 +275,7 @@ export function TimeGrid({
               ))}
             </div>
 
-            {byDay.map(({ day, key, events }) => {
+            {byDay.map(({ key, events }) => {
               const isToday = key === format(new Date(), "yyyy-MM-dd");
               const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
               const nowPct = ((nowMin - DAY_START) / TOTAL_MIN) * 100;

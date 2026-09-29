@@ -90,6 +90,103 @@ export function emptyPlannerSnapshot(): PlannerSnapshot {
   };
 }
 
+function foldedCourseText(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function legacySectionKind(course: Course): CourseSectionKind {
+  const value = foldedCourseText(`${course.name} ${course.code}`);
+  if (/\b(practica|practico|pract|prac|laboratorio|lab)\b/.test(value) || /[-_\s](p|pra)$/.test(value)) return "practice";
+  if (/\b(teoria|teorico|teorica|teo)\b/.test(value) || /[-_\s]t$/.test(value)) return "theory";
+  return "other";
+}
+
+function legacyBaseText(value: string): string {
+  return value
+    .replace(/\bparalelo\s+(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)(?:\s+[A-Z0-9]{1,3})?\b/gi, " ")
+    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b\s*[)\]]?/gi, " ")
+    .replace(/\bparalelo(?:\s+[A-Z0-9]+)?\b/gi, " ")
+    .replace(/\s*[-–—|/]\s*[TP]\s*$/i, "")
+    .replace(/\s*[-–—|/]\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function legacyAcademicCode(course: Course): string | null {
+  return `${course.code} ${course.name}`.toUpperCase().match(/\b[A-Z]{3,6}\d{3,5}\b/)?.[0] ?? null;
+}
+
+/** Migra sincronizaciones anteriores que guardaban teoría y práctica como materias separadas. */
+export function upgradeCanvasCourseSections<T extends PlannerSnapshot>(state: T): T {
+  const candidates = state.courses.filter((course) => course.source === "canvas" && !course.sections?.length);
+  if (candidates.length < 2) return state;
+
+  const groups = new Map<string, Course[]>();
+  for (const course of candidates) {
+    const baseName = legacyBaseText(course.name);
+    const identity = legacyAcademicCode(course) ?? foldedCourseText(baseName);
+    const key = `${course.semesterId}:${identity}`;
+    groups.set(key, [...(groups.get(key) ?? []), course]);
+  }
+
+  const remap = new Map<string, string>();
+  const replacements = new Map<string, Course>();
+  for (const group of groups.values()) {
+    const detected = group.map(legacySectionKind);
+    if (group.length < 2 || !detected.includes("practice")) continue;
+    const inferKind = (course: Course): CourseSectionKind => {
+      const kind = legacySectionKind(course);
+      return kind === "other" && !detected.includes("theory") ? "theory" : kind;
+    };
+    const order = { theory: 0, practice: 1, other: 2 };
+    const sorted = [...group].sort((a, b) => order[inferKind(a)] - order[inferKind(b)] || a.id.localeCompare(b.id));
+    const primary = sorted[0];
+    const seen = new Map<CourseSectionKind, number>();
+    const sections = sorted.map((course): CourseSection => {
+      const kind = inferKind(course);
+      const occurrence = (seen.get(kind) ?? 0) + 1;
+      seen.set(kind, occurrence);
+      const baseLabel = kind === "theory" ? "Teoría" : kind === "practice" ? "Práctica" : "Sección";
+      return {
+        id: `canvas-section-${course.externalId ?? course.id}`,
+        kind,
+        label: occurrence > 1 ? `${baseLabel} ${occurrence}` : baseLabel,
+        name: course.name,
+        code: course.code,
+        professorIds: course.professorId ? [course.professorId] : [],
+        externalId: course.externalId ?? course.id,
+        externalUrl: course.externalUrl ?? null,
+      };
+    });
+    for (const course of sorted) remap.set(course.id, primary.id);
+    replacements.set(primary.id, {
+      ...primary,
+      name: legacyBaseText(primary.name),
+      code: legacyAcademicCode(primary) ?? legacyBaseText(primary.code),
+      externalId: sorted.map((course) => course.externalId ?? course.id).join(","),
+      sections,
+    });
+  }
+  if (remap.size === 0) return state;
+
+  const courseId = (id: string) => remap.get(id) ?? id;
+  return {
+    ...state,
+    courses: state.courses.flatMap((course) => {
+      const target = remap.get(course.id);
+      if (!target) return [course];
+      return target === course.id ? [replacements.get(course.id) ?? course] : [];
+    }),
+    schedules: state.schedules.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+    attendance: state.attendance.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+    tasks: state.tasks.map((item) => ({ ...item, courseId: item.courseId ? courseId(item.courseId) : null })),
+    assessments: state.assessments.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+    grades: state.grades.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+    notionWorkspaces: state.notionWorkspaces.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+    materials: state.materials.map((item) => ({ ...item, courseId: courseId(item.courseId) })),
+  };
+}
+
 export function mergeCanvasSync(state: PlannerSnapshot, payload: CanvasSyncPayload): PlannerSnapshot {
   const isDemoState = state.activeSemesterId === "sem-2026-2" && state.courses.length === 6
     && state.courses.every((course) => /^co[1-6]$/.test(course.id));

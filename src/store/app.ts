@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import { buildSeedData, emptyData } from "@/lib/seed";
 import { uid } from "@/lib/utils";
-import { mergeCanvasSync } from "@academic-planner/core";
+import { mergeCanvasSync, upgradeCanvasCourseSections } from "@academic-planner/core";
 import type {
   AppNotification,
   Assessment,
@@ -167,12 +167,12 @@ setTheme: (theme) => set({ theme }),
         })),
 
       patchData: (fragment) =>
-        set((s) => ({
-          ...s,
-          ...fragment,
-          theme: fragment.theme ?? s.theme,
-          initialized: true,
-        })),
+        set((s) => upgradeCanvasCourseSections({
+            ...s,
+            ...fragment,
+            theme: fragment.theme ?? s.theme,
+            initialized: true,
+          })),
 
       addCourse: (draft) => {
         const courseId = uid("co");
@@ -395,7 +395,8 @@ setTheme: (theme) => set({ theme }),
     }),
     {
       name: "academic-planner-store",
-      version: 1,
+      version: 2,
+      migrate: (persisted) => upgradeCanvasCourseSections(persisted as AppStore),
       partialize: (s) => ({
         initialized: s.initialized,
         profile: s.profile,
