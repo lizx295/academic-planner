@@ -39,7 +39,6 @@ export interface AssessmentRowProps {
   gradeScore?: number | null;
   onEdit?: () => void;
   onDelete?: () => void;
-  onGrade?: () => void;
 }
 
 export function AssessmentRow({
@@ -48,11 +47,11 @@ export function AssessmentRow({
   gradeScore,
   onEdit,
   onDelete,
-  onGrade,
 }: AssessmentRowProps) {
   const [confirming, setConfirming] = useState(false);
   const cls = courseColorClasses(courseColor);
   const graded = assessment.status === "graded";
+  const canManageContent = assessment.source !== "canvas";
 
   return (
     <div className="flex items-center gap-3 px-3 py-3">
@@ -89,30 +88,20 @@ export function AssessmentRow({
 
       <div className="flex shrink-0 items-center gap-1">
         {graded ? (
-          <button
-            type="button"
-            onClick={onGrade}
-            aria-label="Ver calificación"
-            className="flex h-8 items-center rounded-lg bg-present-soft px-2.5 text-sm font-semibold tabular-nums text-present transition-colors hover:brightness-95"
+          <span
+            className="flex h-8 items-center rounded-lg bg-present-soft px-2.5 text-sm font-semibold tabular-nums text-present"
+            title="Calificación sincronizada; no se puede modificar desde el planificador"
           >
             {formatScore(gradeScore)}
-          </button>
-        ) : onGrade ? (
-          <button
-            type="button"
-            onClick={onGrade}
-            className="flex h-8 items-center rounded-lg bg-surface-subtle px-2.5 text-xs font-medium text-text-muted transition-colors hover:bg-accent-soft hover:text-accent"
-          >
-            Calificar
-          </button>
+          </span>
         ) : null}
 
-        {onEdit ? (
+        {canManageContent && onEdit ? (
           <IconButton aria-label="Editar evaluación" size="icon" className="h-7 w-7" onClick={onEdit}>
             <Pencil size={14} />
           </IconButton>
         ) : null}
-        {onDelete ? (
+        {canManageContent && onDelete ? (
           confirming ? (
             <IconButton
               aria-label="Confirmar eliminación"

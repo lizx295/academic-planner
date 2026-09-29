@@ -181,9 +181,9 @@ export default function TasksPage() {
                       key={t.id}
                       task={t}
                       course={courseById.get(t.courseId ?? "")}
-                      canEdit
-                      onEdit={() => setForm({ open: true, task: t })}
-                      onDelete={() => deleteTask(t.id)}
+                      canEdit={t.source !== "canvas"}
+                      onEdit={t.source === "canvas" ? undefined : () => setForm({ open: true, task: t })}
+                      onDelete={t.source === "canvas" ? undefined : () => deleteTask(t.id)}
                     />
                   ))}
                 </div>

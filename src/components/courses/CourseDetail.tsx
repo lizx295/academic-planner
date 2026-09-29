@@ -46,7 +46,6 @@ import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { AssessmentFormDialog } from "@/components/assessments/AssessmentFormDialog";
-import { GradeDialog } from "@/components/assessments/GradeDialog";
 import { AttendanceRow } from "@/components/attendance/AttendanceRow";
 import { AttendanceCorrectionDialog } from "@/components/attendance/AttendanceCorrectionDialog";
 import { MaterialFormDialog } from "@/components/materials/MaterialFormDialog";
@@ -114,7 +113,6 @@ export default function CourseDetailPage() {
     open: boolean;
     assessment: Assessment | null;
   }>({ open: false, assessment: null });
-  const [gradeFor, setGradeFor] = useState<Assessment | null>(null);
   const [correcting, setCorrecting] = useState<AttendanceRecord | null>(null);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -485,9 +483,9 @@ export default function CourseDetailPage() {
                     key={t.id}
                     task={t}
                     course={course}
-                    canEdit
-                    onEdit={() => setTaskForm({ open: true, task: t })}
-                    onDelete={() => deleteTask(t.id)}
+                    canEdit={t.source !== "canvas"}
+                    onEdit={t.source === "canvas" ? undefined : () => setTaskForm({ open: true, task: t })}
+                    onDelete={t.source === "canvas" ? undefined : () => deleteTask(t.id)}
                   />
                 ))}
                 <div className="px-3 py-3">
@@ -525,9 +523,8 @@ export default function CourseDetailPage() {
                     assessment={a}
                     courseColor={course.color}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onEdit={() => setAssessmentForm({ open: true, assessment: a })}
-                    onDelete={() => deleteAssessment(a.id)}
-                    onGrade={() => setGradeFor(a)}
+                    onEdit={a.source === "canvas" ? undefined : () => setAssessmentForm({ open: true, assessment: a })}
+                    onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
                 ))}
                 <div className="px-3 py-3">
@@ -608,18 +605,16 @@ export default function CourseDetailPage() {
                 <EmptyState
                   icon={<CheckCircle2 size={22} aria-hidden="true" />}
                   title="Aún no hay calificaciones"
-                  description='Usa "Calificar" en una evaluación para registrar tu nota.'
+                  description="Las calificaciones aparecerán aquí cuando sean publicadas y sincronizadas desde Canvas."
                 />
               ) : (
                 gradedDown.map((a) => {
                   const g = grades.find((x) => x.assessmentId === a.id);
                   const score = g?.score ?? 0;
                   return (
-                    <button
+                    <div
                       key={a.id}
-                      type="button"
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-subtle"
-                      onClick={() => setGradeFor(a)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
                     >
                       <progress
                         value={score}
@@ -638,7 +633,7 @@ export default function CourseDetailPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold tabular-nums text-text">{score}</span>
-                    </button>
+                    </div>
                   );
                 })
               )}
@@ -725,7 +720,6 @@ export default function CourseDetailPage() {
         assessment={assessmentForm.assessment}
         defaultCourseId={course.id}
       />
-      <GradeDialog open={Boolean(gradeFor)} onClose={() => setGradeFor(null)} assessment={gradeFor} />
       <AttendanceCorrectionDialog
         record={correcting}
         course={course}

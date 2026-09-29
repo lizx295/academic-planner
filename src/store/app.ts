@@ -97,7 +97,6 @@ interface AppStore {
   addAssessment: (a: Omit<Assessment, "id" | "status">) => void;
   updateAssessment: (id: string, patch: Partial<Assessment>) => void;
   deleteAssessment: (id: string) => void;
-  setGrade: (assessmentId: string, courseId: string, score: number, note?: string) => void;
 
   // --- asistencia ---
   respondAttendance: (id: string, status: "present" | "absent") => void;
@@ -267,10 +266,14 @@ setTheme: (theme) => set({ theme }),
           tasks: [{ ...task, id: uid("task"), createdAt: new Date().toISOString() }, ...s.tasks],
         })),
       updateTask: (id, patch) =>
-        set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id && t.source !== "canvas" ? { ...t, ...patch } : t)),
+        })),
       setTaskStatus: (id, status) =>
         set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)) })),
-      deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+      deleteTask: (id) => set((s) => ({
+        tasks: s.tasks.filter((t) => t.id !== id || t.source === "canvas"),
+      })),
 
       addAssessment: (a) =>
         set((s) => ({
@@ -281,28 +284,17 @@ setTheme: (theme) => set({ theme }),
         })),
       updateAssessment: (id, patch) =>
         set((s) => ({
-          assessments: s.assessments.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+          assessments: s.assessments.map((a) =>
+            a.id === id && a.source !== "canvas" ? { ...a, ...patch } : a,
+          ),
         })),
       deleteAssessment: (id) =>
-        set((s) => ({
-          assessments: s.assessments.filter((a) => a.id !== id),
-          grades: s.grades.filter((g) => g.assessmentId !== id),
-        })),
-      setGrade: (assessmentId, courseId, score, note = "") =>
         set((s) => {
-          const existing = s.grades.find((g) => g.assessmentId === assessmentId);
-          if (existing) {
-            return {
-              grades: s.grades.map((g) =>
-                g.assessmentId === assessmentId ? { ...g, score, note } : g,
-              ),
-            };
-          }
+          const assessment = s.assessments.find((a) => a.id === id);
+          if (assessment?.source === "canvas") return {};
           return {
-            grades: [...s.grades, { id: uid("gr"), assessmentId, courseId, score, note }],
-            assessments: s.assessments.map((a) =>
-              a.id === assessmentId ? { ...a, status: "graded" as const } : a,
-            ),
+            assessments: s.assessments.filter((a) => a.id !== id),
+            grades: s.grades.filter((g) => g.assessmentId !== id),
           };
         }),
 

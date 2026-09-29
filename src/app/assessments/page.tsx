@@ -16,7 +16,6 @@ import { Progress } from "@/components/ui/Progress";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { AssessmentFormDialog } from "@/components/assessments/AssessmentFormDialog";
-import { GradeDialog } from "@/components/assessments/GradeDialog";
 
 export default function AssessmentsPage() {
   const { activeAssessments, activeCourses, courses, grades } = useSemesterData();
@@ -26,7 +25,6 @@ export default function AssessmentsPage() {
     open: false,
     assessment: null,
   });
-  const [grading, setGrading] = useState<Assessment | null>(null);
 
   const withCourse = useMemo(
     () => attachCourseName(activeAssessments, courses),
@@ -152,9 +150,8 @@ export default function AssessmentsPage() {
                     assessment={a}
                     courseColor={a.courseColor}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onEdit={() => setForm({ open: true, assessment: a })}
-                    onDelete={() => deleteAssessment(a.id)}
-                    onGrade={() => setGrading(a)}
+                    onEdit={a.source === "canvas" ? undefined : () => setForm({ open: true, assessment: a })}
+                    onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
                 ))}
               </div>
@@ -192,9 +189,8 @@ export default function AssessmentsPage() {
                     assessment={a}
                     courseColor={a.courseColor}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onEdit={() => setForm({ open: true, assessment: a })}
-                    onDelete={() => deleteAssessment(a.id)}
-                    onGrade={() => setGrading(a)}
+                    onEdit={a.source === "canvas" ? undefined : () => setForm({ open: true, assessment: a })}
+                    onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
                 ))}
               </div>
@@ -209,7 +205,6 @@ export default function AssessmentsPage() {
         courses={activeCourses}
         assessment={form.assessment}
       />
-      <GradeDialog open={Boolean(grading)} onClose={() => setGrading(null)} assessment={grading} />
     </div>
   );
 }

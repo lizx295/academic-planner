@@ -5,6 +5,7 @@ import { parseISO } from "date-fns";
 import { Check, Pencil, Trash2 } from "lucide-react";
 
 import { useAppStore } from "@/store/app";
+import { useNow } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import type { Course, Task } from "@/types";
 import { fmtRelativeDay } from "@/lib/format";
@@ -28,12 +29,14 @@ export interface TaskRowProps {
 export function TaskRow({ task, course, canEdit, onEdit, onDelete }: TaskRowProps) {
   const setTaskStatus = useAppStore((s) => s.setTaskStatus);
   const [confirming, setConfirming] = useState(false);
+  const canManageContent = Boolean(canEdit) && task.source !== "canvas";
+  const now = useNow(60_000);
 
   const due = parseISO(task.dueDate);
   const dueAt = task.dueTime
     ? new Date(`${task.dueDate}T${task.dueTime}`).getTime()
     : startOfToday(due);
-  const overdue = task.status !== "completed" && dueAt <= Date.now();
+  const overdue = task.status !== "completed" && dueAt <= now.getTime();
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
@@ -86,7 +89,7 @@ export function TaskRow({ task, course, canEdit, onEdit, onDelete }: TaskRowProp
         {task.priority === "high" ? "Alta" : task.priority === "medium" ? "Media" : "Baja"}
       </Badge>
 
-      {canEdit ? (
+      {canManageContent ? (
         <div className="flex shrink-0 items-center gap-0.5">
           <IconButton
             aria-label="Editar tarea"
