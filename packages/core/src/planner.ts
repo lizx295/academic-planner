@@ -104,7 +104,7 @@ function legacySectionKind(course: Course): CourseSectionKind {
 function legacyBaseText(value: string): string {
   return value
     .replace(/\bparalelo\s+(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)(?:\s+[A-Z0-9]{1,3})?\b/gi, " ")
-    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b\s*[)\]]?/gi, " ")
+    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b(?:\s*[-–—]?\s*(?:[PT]?\d{1,2}|[A-Z]))?\s*[)\]]?/gi, " ")
     .replace(/\bparalelo(?:\s+[A-Z0-9]+)?\b/gi, " ")
     .replace(/\s*[-–—|/]\s*[TP]\s*$/i, "")
     .replace(/\s*[-–—|/]\s*$/g, "")
@@ -113,13 +113,57 @@ function legacyBaseText(value: string): string {
 }
 
 function legacyAcademicCode(course: Course): string | null {
-  return `${course.code} ${course.name}`.toUpperCase().match(/\b[A-Z]{3,6}\d{3,5}\b/)?.[0] ?? null;
+  for (const value of [course.code, course.name]) {
+    const match = value.toUpperCase().match(/\b[A-Z]{3,6}\s*-?\s*\d{3,5}(?=[^0-9]|$)/)?.[0];
+    const code = match?.replace(/[\s-]/g, "") ?? null;
+    if (code && !code.startsWith("PAO")) return code;
+  }
+  return null;
 }
 
-/** Migra sincronizaciones anteriores que guardaban teoría y práctica como materias separadas. */
+function kindFromText(value: string): CourseSectionKind {
+  const folded = foldedCourseText(value);
+  if (/\b(practica|practico|pract|prac|laboratorio|lab)\b/.test(folded) || /[-_\s](p|pra)$/.test(folded)) return "practice";
+  if (/\b(teoria|teorico|teorica|teo)\b/.test(folded) || /[-_\s]t$/.test(folded)) return "theory";
+  return "other";
+}
+
+/** Migra periodos y materias Canvas que guardaban teoría y práctica por separado. */
 export function upgradeCanvasCourseSections<T extends PlannerSnapshot>(state: T): T {
-  const candidates = state.courses.filter((course) => course.source === "canvas" && !course.sections?.length);
-  if (candidates.length < 2) return state;
+  const originalSemesterLabels = new Map(state.semesters.map((semester) => [semester.id, semester.label]));
+  const originalSemesterByCourseId = new Map(state.courses.map((course) => [course.id, course.semesterId]));
+  const semesterGroups = new Map<string, Semester[]>();
+  for (const semester of state.semesters.filter((item) => item.source === "canvas")) {
+    const baseLabel = legacyBaseText(semester.label) || "Periodo Canvas";
+    const genericSuffix = foldedCourseText(baseLabel) === "periodo canvas"
+      ? `:${semester.startsAt}:${semester.endsAt}`
+      : "";
+    const key = `${foldedCourseText(baseLabel)}${genericSuffix}`;
+    semesterGroups.set(key, [...(semesterGroups.get(key) ?? []), semester]);
+  }
+
+  const semesterRemap = new Map<string, string>();
+  const semesterReplacements = new Map<string, Semester>();
+  for (const group of semesterGroups.values()) {
+    const sorted = [...group].sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.id.localeCompare(b.id));
+    const primary = sorted[0];
+    for (const semester of sorted) semesterRemap.set(semester.id, primary.id);
+    const externalIds = sorted.flatMap((semester) => (semester.externalId ?? semester.id).split(","));
+    semesterReplacements.set(primary.id, {
+      ...primary,
+      label: legacyBaseText(primary.label) || "Periodo Canvas",
+      startsAt: sorted.map((semester) => semester.startsAt).sort()[0],
+      endsAt: sorted.map((semester) => semester.endsAt).sort().at(-1) ?? primary.endsAt,
+      externalId: [...new Set(externalIds)].join(","),
+    });
+  }
+
+  const semesterId = (id: string) => semesterRemap.get(id) ?? id;
+  const normalizedCourses = state.courses.map((course) => ({
+    ...course,
+    semesterId: semesterId(course.semesterId),
+  }));
+  const candidates = normalizedCourses.filter((course) => course.source === "canvas");
 
   const groups = new Map<string, Course[]>();
   for (const course of candidates) {
@@ -132,47 +176,78 @@ export function upgradeCanvasCourseSections<T extends PlannerSnapshot>(state: T)
   const remap = new Map<string, string>();
   const replacements = new Map<string, Course>();
   for (const group of groups.values()) {
-    const detected = group.map(legacySectionKind);
+    const courseKind = (course: Course): CourseSectionKind => {
+      if (course.sections?.some((section) => section.kind === "practice")) return "practice";
+      if (course.sections?.some((section) => section.kind === "theory")) return "theory";
+      const direct = legacySectionKind(course);
+      return direct === "other"
+        ? kindFromText(originalSemesterLabels.get(originalSemesterByCourseId.get(course.id) ?? "") ?? "")
+        : direct;
+    };
+    const detected = group.map(courseKind);
     if (group.length < 2 || !detected.includes("practice")) continue;
     const inferKind = (course: Course): CourseSectionKind => {
-      const kind = legacySectionKind(course);
+      const kind = courseKind(course);
       return kind === "other" && !detected.includes("theory") ? "theory" : kind;
     };
     const order = { theory: 0, practice: 1, other: 2 };
     const sorted = [...group].sort((a, b) => order[inferKind(a)] - order[inferKind(b)] || a.id.localeCompare(b.id));
     const primary = sorted[0];
     const seen = new Map<CourseSectionKind, number>();
-    const sections = sorted.map((course): CourseSection => {
-      const kind = inferKind(course);
-      const occurrence = (seen.get(kind) ?? 0) + 1;
-      seen.set(kind, occurrence);
-      const baseLabel = kind === "theory" ? "Teoría" : kind === "practice" ? "Práctica" : "Sección";
-      return {
-        id: `canvas-section-${course.externalId ?? course.id}`,
-        kind,
-        label: occurrence > 1 ? `${baseLabel} ${occurrence}` : baseLabel,
-        name: course.name,
-        code: course.code,
-        professorIds: course.professorId ? [course.professorId] : [],
-        externalId: course.externalId ?? course.id,
-        externalUrl: course.externalUrl ?? null,
-      };
+    const sectionIds = new Set<string>();
+    const sections = sorted.flatMap((course): CourseSection[] => {
+      const inferred = inferKind(course);
+      const sourceSections = course.sections?.length
+        ? course.sections
+        : [{
+            id: `canvas-section-${course.externalId ?? course.id}`,
+            kind: inferred,
+            label: "",
+            name: course.name,
+            code: course.code,
+            professorIds: course.professorId ? [course.professorId] : [],
+            externalId: course.externalId ?? course.id,
+            externalUrl: course.externalUrl ?? null,
+          }];
+      return sourceSections.flatMap((section) => {
+        const identity = section.externalId || section.id;
+        if (sectionIds.has(identity)) return [];
+        sectionIds.add(identity);
+        const kind = section.kind === "other" ? inferred : section.kind;
+        const occurrence = (seen.get(kind) ?? 0) + 1;
+        seen.set(kind, occurrence);
+        const baseLabel = kind === "theory" ? "Teoría" : kind === "practice" ? "Práctica" : "Sección";
+        return [{
+          ...section,
+          kind,
+          label: occurrence > 1 ? `${baseLabel} ${occurrence}` : baseLabel,
+        }];
+      });
     });
     for (const course of sorted) remap.set(course.id, primary.id);
+    const externalIds = sorted.flatMap((course) => (course.externalId ?? course.id).split(","));
     replacements.set(primary.id, {
       ...primary,
       name: legacyBaseText(primary.name),
       code: legacyAcademicCode(primary) ?? legacyBaseText(primary.code),
-      externalId: sorted.map((course) => course.externalId ?? course.id).join(","),
+      externalId: [...new Set(externalIds)].join(","),
       sections,
     });
   }
-  if (remap.size === 0) return state;
 
   const courseId = (id: string) => remap.get(id) ?? id;
+  const activeSemesterId = semesterId(state.activeSemesterId);
   return {
     ...state,
-    courses: state.courses.flatMap((course) => {
+    activeSemesterId,
+    semesters: state.semesters.flatMap((semester) => {
+      if (semester.source !== "canvas") return [semester];
+      const target = semesterId(semester.id);
+      if (target !== semester.id) return [];
+      const replacement = semesterReplacements.get(semester.id) ?? semester;
+      return [{ ...replacement, isActive: replacement.id === activeSemesterId }];
+    }),
+    courses: normalizedCourses.flatMap((course) => {
       const target = remap.get(course.id);
       if (!target) return [course];
       return target === course.id ? [replacements.get(course.id) ?? course] : [];
@@ -191,7 +266,7 @@ export function mergeCanvasSync(state: PlannerSnapshot, payload: CanvasSyncPaylo
   const isDemoState = state.activeSemesterId === "sem-2026-2" && state.courses.length === 6
     && state.courses.every((course) => /^co[1-6]$/.test(course.id));
   const local = <T extends { source?: string }>(items: T[]) => items.filter((item) => item.source !== "canvas");
-  return {
+  return upgradeCanvasCourseSections({
     ...state,
     profile: { ...state.profile, ...payload.profile }, activeSemesterId: payload.activeSemesterId,
     semesters: [...(isDemoState ? [] : local(state.semesters)), ...payload.semesters],
@@ -210,5 +285,5 @@ export function mergeCanvasSync(state: PlannerSnapshot, payload: CanvasSyncPaylo
     materials: isDemoState ? [] : state.materials,
     personalEvents: isDemoState ? [] : state.personalEvents,
     initialized: true,
-  };
+  });
 }

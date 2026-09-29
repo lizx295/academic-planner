@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/Button";
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const subscribeToBrowser = () => () => {};
 
 export interface DialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ export interface DialogProps {
 
 export function Dialog({ open, onClose, title, description, size = "md", children, footer }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const isBrowser = useSyncExternalStore(subscribeToBrowser, () => true, () => false);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -63,9 +66,9 @@ export function Dialog({ open, onClose, title, description, size = "md", childre
     };
   }, [open, handleKeyDown]);
 
-  if (!open) return null;
+  if (!open || !isBrowser) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       role="dialog"
@@ -106,6 +109,7 @@ export function Dialog({ open, onClose, title, description, size = "md", childre
         <div className="mt-4">{children}</div>
         {footer ? <div className="mt-5 flex items-center justify-end gap-2">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

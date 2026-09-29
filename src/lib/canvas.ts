@@ -125,7 +125,7 @@ function folded(value: string): string {
 }
 
 function sectionKind(course: CanvasCourse): CourseSectionKind {
-  const value = folded(`${course.name ?? ""} ${course.course_code ?? ""}`);
+  const value = folded(`${course.name ?? ""} ${course.course_code ?? ""} ${course.term?.name ?? ""}`);
   if (/\b(practica|practico|pract|prac|laboratorio|lab)\b/.test(value) || /[-_\s](p|pra)$/.test(value)) return "practice";
   if (/\b(teoria|teorico|teorica|teo)\b/.test(value) || /[-_\s]t$/.test(value)) return "theory";
   return "other";
@@ -134,7 +134,7 @@ function sectionKind(course: CanvasCourse): CourseSectionKind {
 function withoutSection(value: string | undefined): string {
   return (value ?? "")
     .replace(/\bparalelo\s+(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)(?:\s+[A-Z0-9]{1,3})?\b/gi, " ")
-    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b\s*[)\]]?/gi, " ")
+    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b(?:\s*[-–—]?\s*(?:[PT]?\d{1,2}|[A-Z]))?\s*[)\]]?/gi, " ")
     .replace(/\bparalelo(?:\s+[A-Z0-9]+)?\b/gi, " ")
     .replace(/\s*[-–—|/]\s*[TP]\s*$/i, "")
     .replace(/\s*[-–—|/]\s*$/g, "")
@@ -143,8 +143,12 @@ function withoutSection(value: string | undefined): string {
 }
 
 function academicCode(course: CanvasCourse): string | null {
-  const value = `${course.course_code ?? ""} ${course.name ?? ""}`.toUpperCase();
-  return value.match(/\b[A-Z]{3,6}\d{3,5}\b/)?.[0] ?? null;
+  for (const value of [course.course_code ?? "", course.name ?? ""]) {
+    const match = value.toUpperCase().match(/\b[A-Z]{3,6}\s*-?\s*\d{3,5}(?=[^0-9]|$)/)?.[0];
+    const code = match?.replace(/[\s-]/g, "") ?? null;
+    if (code && !code.startsWith("PAO")) return code;
+  }
+  return null;
 }
 
 function stableSlug(value: string): string {
@@ -167,20 +171,39 @@ export function normalizeCanvasData(
   fallbackEnd.setMonth(fallbackEnd.getMonth() + 5);
 
   const termMap = new Map<string, Semester>();
+  const semesterIdByCourseId = new Map<number, string>();
+  const termGroups = new Map<string, CanvasCourse[]>();
   for (const course of canvasCourses) {
-    const externalId = String(course.term?.id ?? "active");
-    const id = `canvas-semester-${externalId}`;
-    if (!termMap.has(id)) {
-      termMap.set(id, {
-        id,
-        label: course.term?.name?.trim() || "Periodo Canvas",
-        startsAt: isoDate(course.term?.start_at ?? course.start_at, now),
-        endsAt: isoDate(course.term?.end_at ?? course.end_at, fallbackEnd),
-        isActive: true,
-        source: "canvas",
-        externalId,
-      });
-    }
+    const label = withoutSection(course.term?.name) || "Periodo Canvas";
+    const dates = `${course.term?.start_at ?? course.start_at ?? ""}:${course.term?.end_at ?? course.end_at ?? ""}`;
+    const identity = folded(label) === "periodo canvas" ? `${folded(label)}:${dates}` : folded(label);
+    termGroups.set(identity, [...(termGroups.get(identity) ?? []), course]);
+  }
+  for (const group of termGroups.values()) {
+    const sorted = [...group].sort((a, b) => {
+      const order = { theory: 0, other: 1, practice: 2 };
+      return order[sectionKind(a)] - order[sectionKind(b)] || (a.term?.id ?? 0) - (b.term?.id ?? 0);
+    });
+    const representative = sorted[0];
+    const externalIds = [...new Set(sorted.map((course) => String(course.term?.id ?? "active")))];
+    const id = `canvas-semester-${representative.term?.id ?? "active"}`;
+    const startsAt = sorted
+      .map((course) => isoDate(course.term?.start_at ?? course.start_at, now))
+      .sort()[0];
+    const endsAt = sorted
+      .map((course) => isoDate(course.term?.end_at ?? course.end_at, fallbackEnd))
+      .sort()
+      .at(-1) ?? fallbackEnd.toISOString().slice(0, 10);
+    termMap.set(id, {
+      id,
+      label: withoutSection(representative.term?.name) || "Periodo Canvas",
+      startsAt,
+      endsAt,
+      isActive: true,
+      source: "canvas",
+      externalId: externalIds.join(","),
+    });
+    for (const course of sorted) semesterIdByCourseId.set(course.id, id);
   }
 
   const professorMap = new Map<string, Professor>();
@@ -197,7 +220,7 @@ export function normalizeCanvasData(
         });
       }
     }
-    const semesterId = `canvas-semester-${course.term?.id ?? "active"}`;
+    const semesterId = semesterIdByCourseId.get(course.id) ?? `canvas-semester-${course.term?.id ?? "active"}`;
     const normalizedCode = academicCode(course) ?? withoutSection(course.course_code);
     const code = normalizedCode || `CANVAS-${course.id}`;
     const name = withoutSection(course.name) || "Materia sin nombre";

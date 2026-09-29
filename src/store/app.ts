@@ -395,7 +395,7 @@ setTheme: (theme) => set({ theme }),
     }),
     {
       name: "academic-planner-store",
-      version: 2,
+      version: 3,
       migrate: (persisted) => upgradeCanvasCourseSections(persisted as AppStore),
       partialize: (s) => ({
         initialized: s.initialized,

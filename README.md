@@ -203,6 +203,8 @@ Cuando Canvas publica componentes teórico y práctico por separado, el
 normalizador los agrupa por periodo y código académico. La interfaz muestra una
 sola materia con bloques independientes de **Teoría** y **Práctica**, pero
 conserva los docentes, enlaces, tareas y calificaciones de ambos componentes.
+Si Canvas asigna identificadores de periodo diferentes a ambos paralelos, se
+consolidan usando el nombre académico normalizado del semestre.
 Los datos guardados por versiones anteriores se migran automáticamente al
 recargar la aplicación; una nueva sincronización con Canvas actualiza después
 los metadatos de ambas secciones.
