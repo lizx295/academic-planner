@@ -171,6 +171,13 @@ export function TimeGrid({
     });
   }, [days, source]);
 
+  const hasOutsideGridEvents = byDay.some(({ events }) =>
+    events.some((event) => {
+      const start = timeToMinutes(event.start);
+      return event.allDay || start < DAY_START || start >= DAY_END;
+    }),
+  );
+
   const gridStyle = {
     gridTemplateColumns: "3.5rem repeat(auto-fit, minmax(0, 1fr))",
   };
@@ -216,6 +223,47 @@ export function TimeGrid({
             })}
           </div>
 
+          {/* Las entregas tardías y los eventos sin hora no deben desaparecer de la vista. */}
+          {hasOutsideGridEvents ? (
+            <div className="grid border-t border-border bg-surface-subtle/20" style={gridStyle}>
+              <div className="px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-text-faint">
+                Entregas
+              </div>
+              {byDay.map(({ key, events }) => {
+                const outsideGridEvents = events.filter((event) => {
+                  const start = timeToMinutes(event.start);
+                  return event.allDay || start < DAY_START || start >= DAY_END;
+                });
+                return (
+                  <div key={`${key}-outside-grid`} className="min-h-12 space-y-1 border-l border-border p-1">
+                    {outsideGridEvents.map((event) => {
+                      const meta = EVENT_META[event.kind];
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={() => onSelectEvent(event)}
+                          className={cn(
+                            "block w-full rounded-md border-l-2 px-2 py-1.5 text-left transition-transform hover:scale-[1.01]",
+                            meta.softColor,
+                          )}
+                          title={`${event.allDay ? "Todo el día" : event.start} · ${event.title}${event.subtitle ? ` — ${event.subtitle}` : ""}`}
+                        >
+                          <span className="block text-[10px] font-medium tabular text-text-muted">
+                            {event.allDay ? "Todo el día" : event.start}
+                          </span>
+                          <span className="mt-0.5 block line-clamp-2 text-[11px] font-semibold leading-tight text-text">
+                            {event.title}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
           {/* Filas horarias extensibles: las coincidencias se apilan sin taparse. */}
           {hourStarts.map((hourStart) => (
             <div key={hourStart} className="grid border-t border-border" style={gridStyle}>
@@ -224,8 +272,9 @@ export function TimeGrid({
               </div>
               {byDay.map(({ key, events }) => {
                 const hourEvents = events.filter((event) => {
+                  if (event.allDay) return false;
                   const start = timeToMinutes(event.start);
-                  return start >= hourStart && start < hourStart + 60;
+                  return start >= DAY_START && start < DAY_END && start >= hourStart && start < hourStart + 60;
                 });
                 const isCurrentHour = key === todayKey && nowMinutes >= hourStart && nowMinutes < hourStart + 60;
                 return (
@@ -320,8 +369,14 @@ export function MobileAgenda({
                         className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left", meta.softColor)}
                       >
                         <span className="flex w-12 shrink-0 flex-col items-end leading-tight tabular">
-                          <span className="text-[13px] font-semibold text-text">{ev.start}</span>
-                          <span className="text-[10px] text-text-faint">{ev.end}</span>
+                          {ev.allDay ? (
+                            <span className="text-[11px] font-semibold leading-tight text-text">Todo el día</span>
+                          ) : (
+                            <>
+                              <span className="text-[13px] font-semibold text-text">{ev.start}</span>
+                              <span className="text-[10px] text-text-faint">{ev.end}</span>
+                            </>
+                          )}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className={cn("block truncate text-sm font-medium text-text")}>{ev.title}</span>

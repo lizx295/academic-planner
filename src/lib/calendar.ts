@@ -84,6 +84,13 @@ const ASSESSMENT_KIND: Record<Assessment["kind"], EventKind> = {
 export function materializeEvents(from: Date, to: Date, src: EventSource): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   const courseById = new Map(src.courses.map((c) => [c.id, c]));
+  const canvasAssessmentKeys = new Set(
+    src.assessments.flatMap((assessment) =>
+      assessment.source === "canvas" && assessment.externalId
+        ? [`${assessment.courseId}:${assessment.externalId}`]
+        : [],
+    ),
+  );
 
   // Clases según horario
   for (const sched of src.schedules) {
@@ -108,6 +115,17 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
   // Tareas abiertas
   for (const task of src.tasks) {
     if (task.status === "completed") continue;
+    // Canvas expone una misma actividad como tarea pendiente y como elemento
+    // calificable. Conservamos ambos registros para sus pantallas respectivas,
+    // pero en el calendario debe existir un único evento.
+    if (
+      task.source === "canvas" &&
+      task.externalId &&
+      task.courseId &&
+      canvasAssessmentKeys.has(`${task.courseId}:${task.externalId}`)
+    ) {
+      continue;
+    }
     const course = task.courseId ? courseById.get(task.courseId) : undefined;
     events.push({
       id: `task-${task.id}`,
@@ -133,8 +151,9 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
       title: a.name,
       subtitle: course.name,
       date: a.date,
-      start: a.time ?? "08:00",
-      end: a.time ?? "08:00",
+      start: a.time ?? "00:00",
+      end: a.time ?? "00:00",
+      allDay: !a.time,
       color: EVENT_COLOR[ASSESSMENT_KIND[a.kind]] ?? "task",
       courseId: course.id,
       refId: a.id,
