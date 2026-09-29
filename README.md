@@ -52,8 +52,8 @@ npm run typecheck:mobile
 ```
 
 Sin variables de Supabase la aplicacion sigue funcionando solo con
-`localStorage`. Sin `CANVAS_ACCESS_TOKEN`, la interfaz funciona normalmente y
-la sincronizacion de Canvas muestra un aviso de configuracion.
+`localStorage`. El usuario puede sincronizar una vez con su token personal; el
+guardado cifrado para futuras sincronizaciones requiere configurar Supabase.
 
 ## Configurar y sincronizar Supabase
 
@@ -86,11 +86,11 @@ usado por las políticas de la migración. No es lo mismo que la API key públic
 Opción recomendada desde el dashboard:
 
 1. Abre **SQL Editor > New query**.
-2. Copia todo el contenido de
-   `supabase/migrations/202609280001_planner_states.sql`.
-3. Ejecuta la consulta con **Run**.
-4. Comprueba en **Table Editor** que exista `planner_states` con las columnas
-   `user_id`, `state`, `created_at` y `updated_at`.
+2. Ejecuta, en orden, el contenido de
+   `supabase/migrations/202609280001_planner_states.sql` y
+   `supabase/migrations/202609290001_canvas_integrations.sql`.
+3. Comprueba en **Table Editor** que existan `planner_states` y
+   `canvas_integrations`.
 
 Para verificar RLS y sus políticas desde SQL Editor puedes ejecutar:
 
@@ -136,6 +136,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_REEMPLAZAR
 Aunque la segunda variable conserva el nombre `ANON_KEY` por compatibilidad,
 acepta la clave publicable actual de Supabase.
 
+Para el backend crea o copia además una **Secret key** (`sb_secret_...`) desde
+**Settings > API Keys**. Se configura como `SUPABASE_SECRET_KEY` únicamente en
+`.env.local` y Vercel; nunca debe usarse en una variable `NEXT_PUBLIC_*`, Expo
+ni código cliente. La clave heredada `service_role` también es compatible, pero
+para proyectos nuevos se recomienda una Secret key independiente.
+
 ### 5. Probar Supabase localmente
 
 1. Crea `.env.local` desde la plantilla y completa las credenciales:
@@ -174,19 +180,17 @@ regrese la conexión.
 
 1. Revoca cualquier token que haya sido compartido por chat, URL, captura o
    historial, y genera uno nuevo en la configuracion de Canvas.
-2. Guarda el token nuevo como `CANVAS_ACCESS_TOKEN` solo en `.env.local` y en
-   las variables privadas de Vercel.
-3. Genera otra clave larga y aleatoria para `CANVAS_SYNC_SECRET`. Esta clave no
-   es el token de Canvas: solo autoriza el boton de sincronizacion.
-4. Mantiene `CANVAS_BASE_URL=https://aulavirtual.espol.edu.ec`.
-5. Abre **Configuracion > Canvas ESPOL y nube**, escribe la clave de
-   sincronizacion y pulsa **Sincronizar ahora**.
+2. Mantén `CANVAS_BASE_URL=https://aulavirtual.espol.edu.ec` en el servidor.
+3. Abre **Configuracion > Canvas ESPOL y nube**, escribe el token personal de
+   Canvas y pulsa **Sincronizar ahora**.
+4. Si Supabase está conectado, deja marcada la opción de guardado cifrado. El
+   token se valida primero y solo entonces se cifra con AES-256-GCM.
 
 En desarrollo local debes crear `.env.local` (no basta con editar
 `.env.example`) y reiniciar `npm run dev` después de cambiar cualquier variable.
-El campo de la interfaz recibe el valor de `CANVAS_SYNC_SECRET`; el valor de
-`CANVAS_ACCESS_TOKEN` se guarda únicamente en el archivo o en Vercel y nunca se
-escribe en la pantalla.
+Cada usuario introduce su propio token; no existe un token global compartido.
+El token viaja por HTTPS al Route Handler, nunca se guarda en `localStorage` y
+nunca vuelve a enviarse al navegador después de almacenarlo.
 
 La ruta `POST /api/canvas/sync` obtiene el perfil, los cursos activos y sus
 actividades. Sigue el encabezado `Link` de Canvas para paginacion, trae las
@@ -235,12 +239,11 @@ creado, están en **Project > Settings > Environment Variables**.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL de Supabase | Pública, incluida en el build |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key de Supabase | Pública; RLS limita el acceso |
+| `SUPABASE_SECRET_KEY` | Clave secreta `sb_secret_...` del proyecto | Privada, solo servidor |
 | `CANVAS_BASE_URL` | `https://aulavirtual.espol.edu.ec` | Privada del servidor |
-| `CANVAS_ACCESS_TOKEN` | Token nuevo generado en Canvas | Secreto del servidor |
-| `CANVAS_SYNC_SECRET` | Clave propia para autorizar el botón de sincronización | Secreto compartido |
+| `CANVAS_TOKEN_ENCRYPTION_KEY` | Clave aleatoria base64 de 32 bytes | Privada, solo servidor |
 
-Genera `CANVAS_SYNC_SECRET` con un valor largo y distinto del token de Canvas,
-por ejemplo:
+Genera `CANVAS_TOKEN_ENCRYPTION_KEY` una sola vez con:
 
 ```bash
 openssl rand -base64 32
@@ -250,9 +253,11 @@ Recomendaciones al guardar las variables:
 
 - Selecciona **Production**, **Preview** y **Development** si quieres que la
   rama principal, los previews y `vercel dev` tengan la misma integración.
-- Marca `CANVAS_ACCESS_TOKEN` y `CANVAS_SYNC_SECRET` como sensibles cuando la
-  interfaz de Vercel ofrezca esa opción.
-- Nunca agregues el prefijo `NEXT_PUBLIC_` a los secretos de Canvas.
+- Marca `SUPABASE_SECRET_KEY` y `CANVAS_TOKEN_ENCRYPTION_KEY` como
+  sensibles cuando la interfaz de Vercel ofrezca esa opción.
+- Nunca agregues el prefijo `NEXT_PUBLIC_` a estas dos variables privadas.
+- Conserva la clave de cifrado: cambiarla sin migrar los datos impedirá descifrar
+  los tokens ya guardados.
 - Las variables públicas de Supabase se incorporan durante el build. Si las
   cambias, debes crear un despliegue nuevo; un deployment anterior no se
   actualiza automáticamente.
@@ -265,13 +270,13 @@ Recomendaciones al guardar las variables:
 3. Verifica que **Respaldo Supabase** muestre **Sincronizado**. Si muestra **Solo
    local**, comprueba las dos variables `NEXT_PUBLIC_SUPABASE_*` y vuelve a
    desplegar.
-4. Escribe el valor de `CANVAS_SYNC_SECRET` en **Clave de sincronización** y
-   pulsa **Sincronizar ahora**.
+4. Escribe un token personal válido de Canvas y pulsa **Sincronizar ahora**.
 5. La interfaz debe informar cuántas materias, tareas y notas fueron
    actualizadas.
 6. Regresa al dashboard de Supabase y comprueba que:
    - apareció un usuario en **Authentication > Users**;
    - `planner_states.updated_at` cambió;
+   - existe una fila por usuario en `canvas_integrations`, sin token en texto plano;
    - el JSON `state` contiene cursos cuyo `source` es `canvas`.
 
 Después de modificar una variable en Vercel, abre **Deployments**, selecciona el
@@ -299,8 +304,9 @@ actualizas valores en el dashboard.
 | **Solo local** en Configuración | Faltan las variables públicas de Supabase en el build; agrégalas y redespliega. |
 | `Anonymous sign-ins are disabled` | Habilita **Allow anonymous sign-ins** en Supabase Auth. |
 | Error de tabla o permisos | Ejecuta la migración y confirma que RLS y las cuatro políticas estén activas. |
-| HTTP 401 al sincronizar | La clave escrita no coincide con `CANVAS_SYNC_SECRET`, o la variable no existe en ese entorno de Vercel. |
-| Canvas indica token inválido | Revoca el token anterior, genera uno nuevo y actualiza `CANVAS_ACCESS_TOKEN`; luego redespliega. |
+| HTTP 401 al sincronizar | Canvas rechazó el token personal o la sesión Supabase expiró. Genera otro token e inténtalo de nuevo. |
+| No guarda el token | Ejecuta la segunda migración y configura `SUPABASE_SECRET_KEY` y `CANVAS_TOKEN_ENCRYPTION_KEY`. |
+| Token guardado no se puede descifrar | Restaura la clave de cifrado original o elimina la integración y registra un token nuevo. |
 | Canvas no devuelve materias | Confirma que existan cursos activos para la cuenta y que el token pertenezca al estudiante correcto. |
 | Funciona localmente pero no en producción | Comprueba que las variables estén asignadas al entorno **Production**, no solo a Development o Preview. |
 
@@ -381,19 +387,21 @@ Web Next.js ───────────────┐
                           ├── Supabase Auth + planner_states
 App Expo / React Native ──┘
           │
-          └── POST /api/canvas/sync en Vercel ── Canvas LMS
-                                                    (token solo en servidor)
+          └── API en Vercel ── Canvas LMS
+                    │
+                    └── canvas_integrations (token cifrado AES-256-GCM)
 ```
 
-La app movil nunca incluye `CANVAS_ACCESS_TOKEN`. En **Mas > Aula Virtual
-ESPOL**, el usuario escribe `CANVAS_SYNC_SECRET`; la app lo envia por HTTPS al
-Route Handler de Vercel, recibe datos normalizados y los combina mediante las
-mismas reglas que usa la web. La clave no se guarda en AsyncStorage.
+En **Mas > Aula Virtual ESPOL**, cada usuario introduce su token personal. La
+app lo envia por HTTPS al Route Handler de Vercel, recibe datos normalizados y
+los combina mediante las mismas reglas que usa la web. Si existe una sesión de
+Supabase, Vercel cifra el token y permite reutilizarlo; nunca se guarda en
+AsyncStorage ni se incluye en el bundle.
 
 Las variables con prefijo `EXPO_PUBLIC_` se incorporan al bundle y, por tanto,
 no son secretos. Solo deben contener la URL y la clave publicable de Supabase,
-ademas de la URL publica de Vercel. Los secretos de Canvas permanecen
-exclusivamente en Vercel.
+ademas de la URL publica de Vercel. La clave de cifrado y `SUPABASE_SECRET_KEY`
+permanecen exclusivamente en Vercel.
 
 > **Identidad entre dispositivos:** web y movil usan actualmente sesiones
 > anonimas independientes. Aunque apunten a la misma base, cada instalacion
