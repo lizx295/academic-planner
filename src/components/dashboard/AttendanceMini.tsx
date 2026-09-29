@@ -25,7 +25,7 @@ export function AttendanceMini() {
   const percent = stats.percent ?? 0;
 
   return (
-    <Card className="fade-up">
+    <Card className="fade-up p-5 sm:p-6">
       <CardHeader
         title="Asistencia"
         description="Resumen general del semestre."

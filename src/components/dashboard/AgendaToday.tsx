@@ -20,7 +20,6 @@ export function AgendaToday() {
   const { activeSchedules, courses, classrooms, personalEvents } = useSemesterData();
   const now = useNow();
 
-  const todayKey = now.toISOString().slice(0, 10);
   const todayMin = now.getHours() * 60 + now.getMinutes();
   const todayDow = now.getDay();
 
@@ -76,7 +75,7 @@ export function AgendaToday() {
   items.sort((a, b) => a.start - b.start);
 
   return (
-    <Card className="fade-up">
+    <Card className="fade-up p-5 sm:p-6">
       <CardHeader
         title="Agenda del día"
         description="Tu horario de hoy según el semestre activo."

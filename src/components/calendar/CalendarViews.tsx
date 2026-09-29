@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { addDays, format, isSameDay, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -10,54 +10,6 @@ import { materializeEvents } from "@/lib/calendar";
 import { timeToMinutes, minutesToTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/types";
-
-/* ================= layout de solapamiento ================= */
-
-interface Placed extends CalendarEvent {
-  col: number;
-  total: number;
-}
-
-export function placeEvents(events: CalendarEvent[]): Placed[] {
-  const sorted = [...events].sort(
-    (a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end),
-  );
-  const placed: Placed[] = [];
-
-  type Interval = { event: CalendarEvent; start: number; end: number };
-  let group: Interval[] = [];
-  let groupEnd = -1;
-
-  function flushGroup() {
-    if (group.length === 0) return;
-    const active: Array<{ col: number; end: number }> = [];
-    const groupPlaced: Array<{ event: CalendarEvent; col: number }> = [];
-    let total = 1;
-    for (const item of group) {
-      for (let i = active.length - 1; i >= 0; i--) {
-        if (active[i].end <= item.start) active.splice(i, 1);
-      }
-      const used = new Set(active.map((entry) => entry.col));
-      let col = 0;
-      while (used.has(col)) col += 1;
-      active.push({ col, end: item.end });
-      total = Math.max(total, col + 1);
-      groupPlaced.push({ event: item.event, col });
-    }
-    placed.push(...groupPlaced.map(({ event, col }) => ({ ...event, col, total })));
-    group = [];
-  }
-
-  for (const event of sorted) {
-    const start = timeToMinutes(event.start);
-    const end = Math.max(timeToMinutes(event.end), start + 30);
-    if (group.length > 0 && start >= groupEnd) flushGroup();
-    group.push({ event, start, end });
-    groupEnd = Math.max(groupEnd, end);
-  }
-  flushGroup();
-  return placed;
-}
 
 /* ================= vista mensual ================= */
 
@@ -188,9 +140,6 @@ export function MonthView({
 
 const DAY_START = 7 * 60;
 const DAY_END = 21 * 60;
-const ROW_H = 56;
-const TOTAL_MIN = DAY_END - DAY_START;
-const GRID_H = ROW_H * (TOTAL_MIN / 60);
 
 export function TimeGrid({
   days,
@@ -201,11 +150,8 @@ export function TimeGrid({
   source: EventSource;
   onSelectEvent: (e: CalendarEvent) => void;
 }) {
-  const hourLabels = useMemo(
-    () =>
-      Array.from({ length: TOTAL_MIN / 60 }, (_, i) =>
-        minutesToTime(DAY_START + i * 60),
-      ),
+  const hourStarts = useMemo(
+    () => Array.from({ length: (DAY_END - DAY_START) / 60 }, (_, i) => DAY_START + i * 60),
     [],
   );
 
@@ -218,14 +164,19 @@ export function TimeGrid({
       return {
         day,
         key,
-        events: all.filter((e) => e.date === key),
+        events: all
+          .filter((e) => e.date === key)
+          .sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title)),
       };
     });
   }, [days, source]);
 
   const gridStyle = {
     gridTemplateColumns: "3.5rem repeat(auto-fit, minmax(0, 1fr))",
-  } satisfies CSSProperties;
+  };
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayKey = format(now, "yyyy-MM-dd");
 
   return (
     <div className="surface-card overflow-hidden">
@@ -265,92 +216,57 @@ export function TimeGrid({
             })}
           </div>
 
-          {/* rejilla de horas */}
-          <div className="grid" style={gridStyle}>
-            <div className="relative" style={{ height: GRID_H }}>
-              {hourLabels.map((label) => (
-                <div key={label} className="absolute right-2 text-[11px] tabular text-text-faint" style={{ top: hourTopPct(label) }}>
-                  {label}
-                </div>
-              ))}
+          {/* Filas horarias extensibles: las coincidencias se apilan sin taparse. */}
+          {hourStarts.map((hourStart) => (
+            <div key={hourStart} className="grid border-t border-border" style={gridStyle}>
+              <div className="px-2 py-2 text-right text-[11px] tabular text-text-faint">
+                {minutesToTime(hourStart)}
+              </div>
+              {byDay.map(({ key, events }) => {
+                const hourEvents = events.filter((event) => {
+                  const start = timeToMinutes(event.start);
+                  return start >= hourStart && start < hourStart + 60;
+                });
+                const isCurrentHour = key === todayKey && nowMinutes >= hourStart && nowMinutes < hourStart + 60;
+                return (
+                  <div
+                    key={`${key}-${hourStart}`}
+                    className={cn(
+                      "min-h-14 space-y-1 border-l border-border p-1",
+                      isCurrentHour && "bg-accent-soft/10",
+                    )}
+                  >
+                    {hourEvents.map((event) => {
+                      const meta = EVENT_META[event.kind];
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={() => onSelectEvent(event)}
+                          className={cn(
+                            "block w-full rounded-md border-l-2 px-2 py-1.5 text-left transition-transform hover:scale-[1.01]",
+                            meta.softColor,
+                          )}
+                          title={`${event.start} · ${event.title}${event.subtitle ? ` — ${event.subtitle}` : ""}`}
+                        >
+                          <span className="block text-[10px] font-medium tabular text-text-muted">
+                            {event.start}{event.end !== event.start ? ` – ${event.end}` : ""}
+                          </span>
+                          <span className="mt-0.5 block line-clamp-2 text-[11px] font-semibold leading-tight text-text">
+                            {event.title}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
-
-            {byDay.map(({ key, events }) => {
-              const isToday = key === format(new Date(), "yyyy-MM-dd");
-              const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-              const nowPct = ((nowMin - DAY_START) / TOTAL_MIN) * 100;
-              const placed = placeEvents(events).filter(
-                (e) => timeToMinutes(e.end) > DAY_START && timeToMinutes(e.start) < DAY_END,
-              );
-
-              return (
-                <div
-                  key={key}
-                  className={cn("relative border-l border-border", isToday && "bg-accent-soft/5")}
-                  style={{ height: GRID_H }}
-                >
-                  {/* líneas de hora */}
-                  {hourLabels.map((label) => (
-                    <div
-                      key={label}
-                      className="pointer-events-none absolute inset-x-0 border-t border-border"
-                      style={{ top: hourTopPct(label) }}
-                    />
-                  ))}
-
-                  {isToday && nowMin >= DAY_START && nowMin <= DAY_END ? (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-accent"
-                      style={{ top: `${nowPct}%` }}
-                    />
-                  ) : null}
-
-                  {placed.map((ev) => {
-                    const meta = EVENT_META[ev.kind];
-                    const s = Math.max(timeToMinutes(ev.start), DAY_START);
-                    const end = Math.min(timeToMinutes(ev.end), DAY_END);
-                    const duration = Math.max(end - s, 30);
-                    const top = ((s - DAY_START) / TOTAL_MIN) * 100;
-                    const height = (duration / TOTAL_MIN) * 100;
-                    const left = (ev.col / ev.total) * 100 + 0.5;
-                    const width = 100 / ev.total - 1;
-                    return (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => onSelectEvent(ev)}
-                        className={cn(
-                          "absolute z-20 overflow-hidden rounded-md border-l-2 px-1.5 py-1 text-left transition-transform hover:scale-[1.02]",
-                          meta.softColor,
-                        )}
-                        style={{ top: `calc(${top}% + 2px)`, height: `calc(${height}% - 4px)`, left: `${left}%`, width: `${width}%`, minHeight: 22 }}
-                      >
-                        <p className="truncate text-[11px] font-semibold leading-tight text-text">
-                          <span className="tabular">{ev.start}</span>{" "}
-                          {ev.title}
-                        </p>
-                        {ev.subtitle && height > 12 ? (
-                          <p className="mt-px truncate text-[10px] leading-tight text-text-muted">
-                            {ev.subtitle}
-                          </p>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+          ))}
         </div>
       </div>
     </div>
   );
-}
-
-function hourTopPct(time: string): string {
-  const m = timeToMinutes(time);
-  return `${((m - DAY_START) / TOTAL_MIN) * 100}%`;
 }
 
 /* ================= agenda móvil (semana / día) ================= */
@@ -455,4 +371,3 @@ export function CardInner({ children }: { children: ReactNode }) {
 }
 
 export { minutesToTime };
-export type { Placed };

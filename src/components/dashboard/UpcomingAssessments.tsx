@@ -23,7 +23,7 @@ export function UpcomingAssessments() {
     .slice(0, 3);
 
   return (
-    <Card className="fade-up">
+    <Card className="fade-up p-5 sm:p-6">
       <CardHeader
         title="Próximas evaluaciones"
         description="Ordenadas por fecha."

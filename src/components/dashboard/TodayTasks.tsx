@@ -27,7 +27,7 @@ export function TodayTasks() {
     .slice(0, 5);
 
   return (
-    <Card className="fade-up">
+    <Card className="fade-up p-5 sm:p-6">
       <CardHeader
         title="Para hoy"
         description="Vencen hoy o ya están atrasadas."
