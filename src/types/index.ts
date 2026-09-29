@@ -13,6 +13,8 @@ export interface Semester {
   startsAt: string; // ISO date yyyy-MM-dd
   endsAt: string; // ISO date yyyy-MM-dd
   isActive: boolean;
+  source?: "local" | "canvas";
+  externalId?: string;
 }
 
 export interface Professor {
@@ -49,6 +51,9 @@ export interface Course {
   credits: number;
   /** URL de la página de Notion asociada (integración manual v1) */
   notionUrl: string | null;
+  source?: "local" | "canvas";
+  externalId?: string;
+  externalUrl?: string | null;
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
@@ -87,6 +92,9 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   createdAt: string; // ISO datetime
+  source?: "local" | "canvas";
+  externalId?: string;
+  externalUrl?: string | null;
 }
 
 export type AssessmentKind =
@@ -108,6 +116,9 @@ export interface Assessment {
   time: string | null; // "HH:mm" opcional
   weight: number; // porcentaje del semestre (0-100)
   status: AssessmentStatus;
+  source?: "local" | "canvas";
+  externalId?: string;
+  externalUrl?: string | null;
 }
 
 export interface Grade {
@@ -116,6 +127,26 @@ export interface Grade {
   courseId: ID;
   score: number; // 0 - 100
   note: string;
+  source?: "local" | "canvas";
+  externalId?: string;
+}
+
+/** Datos normalizados que devuelve la sincronización server-side con Canvas. */
+export interface CanvasSyncPayload {
+  syncedAt: string;
+  profile: Partial<Profile>;
+  activeSemesterId: ID;
+  semesters: Semester[];
+  professors: Professor[];
+  courses: Course[];
+  tasks: Task[];
+  assessments: Assessment[];
+  grades: Grade[];
+  counts: {
+    courses: number;
+    tasks: number;
+    grades: number;
+  };
 }
 
 export type NotificationKind =

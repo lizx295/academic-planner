@@ -25,6 +25,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Dialog } from "@/components/ui/Dialog";
 import { ImportDialog } from "@/components/import/ImportDialog";
 import { UniversitySelect } from "@/components/settings/UniversitySelect";
+import { IntegrationsCard } from "@/components/settings/IntegrationsCard";
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "Sistema" },
@@ -140,6 +141,8 @@ export default function SettingsPage() {
           </span>
         </div>
       </Card>
+
+      <IntegrationsCard />
 
       <Card className="p-4 sm:p-5">
         <CardHeader
@@ -360,8 +363,8 @@ export default function SettingsPage() {
           </Button>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-text-faint">
-          Todo se guarda solo en este navegador (localStorage). Los datos de ejemplo no pertenecen a
-          ninguna universidad: son inventados para que la app se vea viva.
+          Siempre hay una copia local para trabajar sin conexión. Si Supabase está configurado,
+          también se guarda un respaldo privado asociado a tu sesión anónima.
         </p>
       </Card>
 

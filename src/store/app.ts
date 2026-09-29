@@ -14,12 +14,12 @@ import type {
   CourseSchedule,
   Grade,
   Material,
-  MaterialKind,
   NotionWorkspace,
   PersonalEvent,
   Profile,
   Professor,
   Classroom,
+  CanvasSyncPayload,
   Semester,
   Task,
   TaskPriority,
@@ -119,6 +119,7 @@ interface AppStore {
   importCourses: (drafts: CourseDraft[]) => number;
   importPersonalEvents: (events: Array<Omit<PersonalEvent, "id">>) => void;
   importTasks: (tasks: Array<Omit<Task, "id" | "createdAt">>) => void;
+  applyCanvasSync: (payload: CanvasSyncPayload) => void;
 }
 
 const empty = emptyData();
@@ -387,6 +388,53 @@ setTheme: (theme) => set({ theme }),
           ],
         }));
       },
+      applyCanvasSync: (payload) => {
+        set((s) => {
+          const isDemoState =
+            s.activeSemesterId === "sem-2026-2" &&
+            s.courses.length === 6 &&
+            s.courses.every((course) => /^co[1-6]$/.test(course.id));
+          const local = <T extends { source?: string }>(items: T[]) =>
+            items.filter((item) => item.source !== "canvas");
+
+          return {
+            profile: { ...s.profile, ...payload.profile },
+            activeSemesterId: payload.activeSemesterId,
+            semesters: [
+              ...(isDemoState ? [] : local(s.semesters)),
+              ...payload.semesters,
+            ],
+            professors: [
+              ...(isDemoState ? [] : s.professors.filter((item) => !item.id.startsWith("canvas-professor-"))),
+              ...payload.professors,
+            ],
+            classrooms: isDemoState ? [] : s.classrooms,
+            courses: [
+              ...(isDemoState ? [] : local(s.courses)),
+              ...payload.courses,
+            ],
+            schedules: isDemoState ? [] : s.schedules,
+            attendance: isDemoState ? [] : s.attendance,
+            tasks: [
+              ...(isDemoState ? [] : local(s.tasks)),
+              ...payload.tasks,
+            ],
+            assessments: [
+              ...(isDemoState ? [] : local(s.assessments)),
+              ...payload.assessments,
+            ],
+            grades: [
+              ...(isDemoState ? [] : local(s.grades)),
+              ...payload.grades,
+            ],
+            notifications: isDemoState ? [] : s.notifications,
+            notionWorkspaces: isDemoState ? [] : s.notionWorkspaces,
+            materials: isDemoState ? [] : s.materials,
+            personalEvents: isDemoState ? [] : s.personalEvents,
+            initialized: true,
+          };
+        });
+      },
     }),
     {
       name: "academic-planner-store",
@@ -428,3 +476,27 @@ export { buildSeedData };
 export type { AppStore };
 export type { AssessmentKind };
 export type { TaskPriority, TaskStatus };
+
+/** Estado serializable que se guarda tanto localmente como en Supabase. */
+export function getPersistedPlannerState() {
+  const s = useAppStore.getState();
+  return {
+    initialized: s.initialized,
+    profile: s.profile,
+    activeSemesterId: s.activeSemesterId,
+    semesters: s.semesters,
+    professors: s.professors,
+    classrooms: s.classrooms,
+    courses: s.courses,
+    schedules: s.schedules,
+    attendance: s.attendance,
+    tasks: s.tasks,
+    assessments: s.assessments,
+    grades: s.grades,
+    notifications: s.notifications,
+    notionWorkspaces: s.notionWorkspaces,
+    materials: s.materials,
+    personalEvents: s.personalEvents,
+    theme: s.theme,
+  };
+}
