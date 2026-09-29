@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 
 import { buildSeedData, emptyData } from "@/lib/seed";
 import { uid } from "@/lib/utils";
+import { mergeCanvasSync } from "@academic-planner/core";
 import type {
   AppNotification,
   Assessment,
@@ -389,51 +390,7 @@ setTheme: (theme) => set({ theme }),
         }));
       },
       applyCanvasSync: (payload) => {
-        set((s) => {
-          const isDemoState =
-            s.activeSemesterId === "sem-2026-2" &&
-            s.courses.length === 6 &&
-            s.courses.every((course) => /^co[1-6]$/.test(course.id));
-          const local = <T extends { source?: string }>(items: T[]) =>
-            items.filter((item) => item.source !== "canvas");
-
-          return {
-            profile: { ...s.profile, ...payload.profile },
-            activeSemesterId: payload.activeSemesterId,
-            semesters: [
-              ...(isDemoState ? [] : local(s.semesters)),
-              ...payload.semesters,
-            ],
-            professors: [
-              ...(isDemoState ? [] : s.professors.filter((item) => !item.id.startsWith("canvas-professor-"))),
-              ...payload.professors,
-            ],
-            classrooms: isDemoState ? [] : s.classrooms,
-            courses: [
-              ...(isDemoState ? [] : local(s.courses)),
-              ...payload.courses,
-            ],
-            schedules: isDemoState ? [] : s.schedules,
-            attendance: isDemoState ? [] : s.attendance,
-            tasks: [
-              ...(isDemoState ? [] : local(s.tasks)),
-              ...payload.tasks,
-            ],
-            assessments: [
-              ...(isDemoState ? [] : local(s.assessments)),
-              ...payload.assessments,
-            ],
-            grades: [
-              ...(isDemoState ? [] : local(s.grades)),
-              ...payload.grades,
-            ],
-            notifications: isDemoState ? [] : s.notifications,
-            notionWorkspaces: isDemoState ? [] : s.notionWorkspaces,
-            materials: isDemoState ? [] : s.materials,
-            personalEvents: isDemoState ? [] : s.personalEvents,
-            initialized: true,
-          };
-        });
+        set((s) => mergeCanvasSync(s, payload));
       },
     }),
     {

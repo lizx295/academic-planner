@@ -2,15 +2,25 @@
   "name": "academic-planner",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "description": "Academic Planner - centro académico personal para estudiantes universitarios",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "mobile": "npm run start --workspace @academic-planner/mobile",
+    "mobile:android": "npm run android --workspace @academic-planner/mobile",
+    "mobile:ios": "npm run ios --workspace @academic-planner/mobile",
+    "mobile:web": "npm run web --workspace @academic-planner/mobile",
+    "typecheck:mobile": "npm run typecheck --workspace @academic-planner/mobile"
   },
   "dependencies": {
+    "@academic-planner/core": "*",
     "@supabase/supabase-js": "^2.109.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.40.0",
