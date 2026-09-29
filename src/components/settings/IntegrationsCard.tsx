@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Cloud, CloudOff, ExternalLink, RefreshCcw, School } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Cloud, CloudOff, ExternalLink, RefreshCcw, School, Unplug } from "lucide-react";
 
 import { useCloudSync } from "@/components/providers/CloudSyncProvider";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Field";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAppStore } from "@/store/app";
 import type { CanvasSyncPayload } from "@/types";
 
@@ -19,15 +20,44 @@ export function IntegrationsCard() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
-  const [syncSecret, setSyncSecret] = useState("");
+  const [canvasToken, setCanvasToken] = useState("");
+  const [rememberToken, setRememberToken] = useState(true);
+  const [canvasConnected, setCanvasConnected] = useState(false);
+
+  async function authHeaders(): Promise<Record<string, string>> {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return {};
+    const { data } = await supabase.auth.getSession();
+    return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+  }
+
+  useEffect(() => {
+    if (cloud.status === "connecting") return;
+    let active = true;
+    authHeaders().then(async (headers) => {
+      if (!headers.Authorization) return;
+      const response = await fetch("/api/canvas/sync", { headers });
+      const body = await response.json() as { connected?: boolean };
+      if (active && response.ok) setCanvasConnected(body.connected === true);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [cloud.status]);
 
   async function syncCanvas() {
     setSyncing(true);
     setError(null);
     try {
+      const shouldAuthenticate = rememberToken || canvasConnected;
       const response = await fetch("/api/canvas/sync", {
         method: "POST",
-        headers: { "x-canvas-sync-secret": syncSecret },
+        headers: {
+          "content-type": "application/json",
+          ...(shouldAuthenticate ? await authHeaders() : {}),
+        },
+        body: JSON.stringify({
+          canvasToken: canvasToken || undefined,
+          remember: rememberToken && cloud.status !== "disabled",
+        }),
       });
       const body = (await response.json()) as CanvasSyncPayload | { error?: string };
       if (!response.ok || !("courses" in body)) {
@@ -35,11 +65,28 @@ export function IntegrationsCard() {
       }
       applyCanvasSync(body);
       setResult({ ...body.counts, syncedAt: body.syncedAt });
+      if (canvasToken && rememberToken && cloud.status !== "disabled") setCanvasConnected(true);
+      setCanvasToken("");
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "No se pudo sincronizar con Canvas.");
     } finally {
       setSyncing(false);
     }
+  }
+
+  async function disconnectCanvas() {
+    setError(null);
+    const response = await fetch("/api/canvas/sync", {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    const body = await response.json() as { error?: string };
+    if (!response.ok) {
+      setError(body.error || "No se pudo eliminar el token guardado.");
+      return;
+    }
+    setCanvasConnected(false);
+    setResult(null);
   }
 
   const cloudLabel = {
@@ -69,7 +116,7 @@ export function IntegrationsCard() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-text">Aula Virtual ESPOL</p>
               <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
-                El token se queda en el servidor. Usa la clave privada del despliegue para autorizar la sincronización.
+                Introduce tu token personal. Se envía por HTTPS y, si eliges guardarlo, se cifra únicamente en el servidor.
               </p>
             </div>
           </div>
@@ -77,17 +124,31 @@ export function IntegrationsCard() {
             className="mt-3"
             type="password"
             autoComplete="off"
-            value={syncSecret}
-            onChange={(event) => setSyncSecret(event.target.value)}
-            placeholder="Valor de CANVAS_SYNC_SECRET"
-            aria-label="Valor de CANVAS_SYNC_SECRET"
+            value={canvasToken}
+            onChange={(event) => setCanvasToken(event.target.value)}
+            placeholder={canvasConnected ? "Token guardado; déjalo vacío para reutilizarlo" : "Token personal de Canvas"}
+            aria-label="Token personal de Canvas"
           />
-          <p className="mt-1.5 text-[11px] leading-relaxed text-text-faint">
-            Es la clave que configuraste en <code>.env.local</code> o Vercel; no es el token generado por Canvas.
-          </p>
-          <Button className="mt-2 w-full" variant="primary" loading={syncing} disabled={!syncSecret} onClick={syncCanvas}>
+          <label className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-text-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-[var(--accent)]"
+              checked={rememberToken && cloud.status !== "disabled"}
+              disabled={cloud.status === "disabled"}
+              onChange={(event) => setRememberToken(event.target.checked)}
+            />
+            {cloud.status === "disabled"
+              ? "Conecta Supabase para guardar el token cifrado. Aún puedes usarlo una sola vez."
+              : "Guardar cifrado en Supabase para próximas sincronizaciones."}
+          </label>
+          <Button className="mt-2 w-full" variant="primary" loading={syncing} disabled={!canvasToken && !canvasConnected} onClick={syncCanvas}>
             <RefreshCcw size={15} /> {syncing ? "Sincronizando" : "Sincronizar ahora"}
           </Button>
+          {canvasConnected ? (
+            <Button className="mt-2 w-full" variant="ghost" onClick={disconnectCanvas}>
+              <Unplug size={14} /> Olvidar token guardado
+            </Button>
+          ) : null}
         </div>
 
         <div className="rounded-xl border border-border p-3">

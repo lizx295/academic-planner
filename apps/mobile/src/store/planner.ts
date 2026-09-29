@@ -17,9 +17,24 @@ interface MobilePlannerStore {
   ready: boolean;
   cloudStatus: CloudStatus;
   cloudMessage: string | null;
+  canvasConnected: boolean;
   initialize: () => Promise<void>;
   toggleTask: (id: string) => void;
-  syncCanvas: (secret: string) => Promise<CanvasSyncPayload["counts"]>;
+  syncCanvas: (token?: string) => Promise<CanvasSyncPayload["counts"]>;
+  forgetCanvas: () => Promise<void>;
+}
+
+function webApiUrl(): string {
+  const url = process.env.EXPO_PUBLIC_WEB_API_URL?.replace(/\/$/, "");
+  if (!url) throw new Error("Falta EXPO_PUBLIC_WEB_API_URL.");
+  return url;
+}
+
+async function authorizationHeaders(): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return {};
+  const { data } = await supabase.auth.getSession();
+  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
 }
 
 async function persistSnapshot(snapshot: PlannerSnapshot) {
@@ -38,6 +53,7 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
   ready: false,
   cloudStatus: "local",
   cloudMessage: null,
+  canvasConnected: false,
 
   initialize: async () => {
     try {
@@ -72,6 +88,18 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
         await persistSnapshot(get().snapshot);
       }
       set({ ready: true, cloudStatus: "synced", cloudMessage: null });
+      if (process.env.EXPO_PUBLIC_WEB_API_URL) {
+        try {
+          const headers = await authorizationHeaders();
+          const response = await fetch(`${webApiUrl()}/api/canvas/sync`, { headers });
+          if (response.ok) {
+            const body = await response.json() as { connected?: boolean };
+            set({ canvasConnected: body.connected === true });
+          }
+        } catch {
+          // La disponibilidad de la API de Canvas no cambia el estado del respaldo Supabase.
+        }
+      }
     } catch (error) {
       set({
         ready: true,
@@ -98,12 +126,12 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
     );
   },
 
-  syncCanvas: async (secret) => {
-    const apiUrl = process.env.EXPO_PUBLIC_WEB_API_URL?.replace(/\/$/, "");
-    if (!apiUrl) throw new Error("Falta EXPO_PUBLIC_WEB_API_URL.");
-    const response = await fetch(`${apiUrl}/api/canvas/sync`, {
+  syncCanvas: async (token) => {
+    const auth = await authorizationHeaders();
+    const response = await fetch(`${webApiUrl()}/api/canvas/sync`, {
       method: "POST",
-      headers: { "x-canvas-sync-secret": secret },
+      headers: { "content-type": "application/json", ...auth },
+      body: JSON.stringify({ canvasToken: token || undefined, remember: Boolean(auth.Authorization) }),
     });
     const body = await response.json() as CanvasSyncPayload | { error?: string };
     if (!response.ok || !("courses" in body)) {
@@ -112,7 +140,21 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
     const snapshot = mergeCanvasSync(get().snapshot, body);
     set({ snapshot });
     await persistSnapshot(snapshot);
-    set({ cloudStatus: getSupabaseClient() ? "synced" : "local", cloudMessage: null });
+    set({
+      cloudStatus: getSupabaseClient() ? "synced" : "local",
+      cloudMessage: null,
+      canvasConnected: Boolean(auth.Authorization) || get().canvasConnected,
+    });
     return body.counts;
+  },
+
+  forgetCanvas: async () => {
+    const response = await fetch(`${webApiUrl()}/api/canvas/sync`, {
+      method: "DELETE",
+      headers: await authorizationHeaders(),
+    });
+    const body = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(body.error || "No se pudo eliminar el token guardado.");
+    set({ canvasConnected: false });
   },
 }));

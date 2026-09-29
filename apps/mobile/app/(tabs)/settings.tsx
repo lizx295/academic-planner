@@ -13,20 +13,31 @@ export default function SettingsScreen() {
   const snapshot = usePlannerStore((state) => state.snapshot);
   const cloudStatus = usePlannerStore((state) => state.cloudStatus);
   const cloudMessage = usePlannerStore((state) => state.cloudMessage);
+  const canvasConnected = usePlannerStore((state) => state.canvasConnected);
   const syncCanvas = usePlannerStore((state) => state.syncCanvas);
-  const [secret, setSecret] = useState("");
+  const forgetCanvas = usePlannerStore((state) => state.forgetCanvas);
+  const [token, setToken] = useState("");
   const [syncing, setSyncing] = useState(false);
 
   async function onSync() {
     setSyncing(true);
     try {
-      const counts = await syncCanvas(secret);
-      setSecret("");
+      const counts = await syncCanvas(token || undefined);
+      setToken("");
       Alert.alert("Sincronización completada", `${counts.courses} materias, ${counts.tasks} tareas y ${counts.grades} notas actualizadas.`);
     } catch (error) {
       Alert.alert("No se pudo sincronizar", error instanceof Error ? error.message : "Revisa la configuración.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function onForget() {
+    try {
+      await forgetCanvas();
+      Alert.alert("Token eliminado", "El token cifrado se eliminó de Supabase.");
+    } catch (error) {
+      Alert.alert("No se pudo eliminar", error instanceof Error ? error.message : "Inténtalo otra vez.");
     }
   }
 
@@ -58,31 +69,37 @@ export default function SettingsScreen() {
           <View style={[styles.icon, { backgroundColor: colors.accentSoft }]}><Ionicons name="school-outline" size={18} color={colors.accent} /></View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>Aula Virtual ESPOL</Text>
-            <Text style={[styles.description, { color: colors.textMuted }]}>Usa la misma API segura desplegada con la aplicación web.</Text>
+            <Text style={[styles.description, { color: colors.textMuted }]}>Introduce tu token personal. Con Supabase se guarda cifrado en el servidor.</Text>
           </View>
         </View>
         <TextInput
-          value={secret}
-          onChangeText={setSecret}
-          placeholder="Clave de sincronización"
+          value={token}
+          onChangeText={setToken}
+          placeholder={canvasConnected ? "Token guardado; vacío para reutilizar" : "Token personal de Canvas"}
           placeholderTextColor={colors.textFaint}
           secureTextEntry
           autoCapitalize="none"
           style={[styles.input, { color: colors.text, borderColor: colors.borderStrong, backgroundColor: colors.surfaceSubtle }]}
         />
         <Pressable
-          disabled={!secret || syncing}
+          disabled={(!token && !canvasConnected) || syncing}
           onPress={() => { void onSync(); }}
-          style={({ pressed }) => [styles.button, { backgroundColor: colors.accent, opacity: !secret || syncing ? 0.45 : pressed ? 0.8 : 1 }]}
+          style={({ pressed }) => [styles.button, { backgroundColor: colors.accent, opacity: (!token && !canvasConnected) || syncing ? 0.45 : pressed ? 0.8 : 1 }]}
         >
           {syncing ? <ActivityIndicator color={colors.onAccent} size="small" /> : <Ionicons name="sync-outline" size={17} color={colors.onAccent} />}
           <Text style={[styles.buttonText, { color: colors.onAccent }]}>{syncing ? "Sincronizando" : "Sincronizar ahora"}</Text>
         </Pressable>
+        {canvasConnected ? (
+          <Pressable onPress={() => { void onForget(); }} style={styles.forgetButton}>
+            <Ionicons name="unlink-outline" size={15} color={colors.textMuted} />
+            <Text style={[styles.forgetText, { color: colors.textMuted }]}>Olvidar token guardado</Text>
+          </Pressable>
+        ) : null}
       </Card>
 
       <Card>
         <SectionTitle>Arquitectura compartida</SectionTitle>
-        <Text style={[styles.description, { color: colors.textMuted }]}>Esta app usa los mismos tipos, reglas de sincronización y colores que Academic Planner web. El token de Canvas permanece únicamente en Vercel.</Text>
+        <Text style={[styles.description, { color: colors.textMuted }]}>Esta app usa los mismos tipos, reglas de sincronización y colores que Academic Planner web. El token nunca se incluye en el bundle ni se devuelve al dispositivo.</Text>
       </Card>
     </Screen>
   );
@@ -102,4 +119,6 @@ const styles = StyleSheet.create({
   input: { marginTop: 15, height: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, fontSize: 14 },
   button: { marginTop: 10, height: 46, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   buttonText: { fontSize: 14, fontWeight: "700" },
+  forgetButton: { marginTop: 11, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  forgetText: { fontSize: 12, fontWeight: "600" },
 });

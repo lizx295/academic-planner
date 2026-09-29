@@ -1,5 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
 import {
@@ -8,46 +6,31 @@ import {
   type CanvasCourse,
   type CanvasProfile,
 } from "@/lib/canvas";
+import {
+  authenticatedUserId,
+  CanvasTokenVaultError,
+  deleteCanvasToken,
+  hasStoredCanvasToken,
+  loadCanvasToken,
+  markCanvasTokenSynced,
+  saveCanvasToken,
+} from "@/lib/supabase/canvas-token-vault";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 class CanvasApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  constructor(message: string, readonly status: number) {
     super(message);
   }
 }
 
-function canvasConfig() {
+function canvasBaseUrl(): string {
   const baseUrl = (process.env.CANVAS_BASE_URL || "https://aulavirtual.espol.edu.ec").replace(/\/$/, "");
-  const token = process.env.CANVAS_ACCESS_TOKEN?.trim();
-  if (!token) throw new CanvasApiError("Falta configurar CANVAS_ACCESS_TOKEN en el servidor.", 503);
-  const parsed = new URL(baseUrl);
-  if (parsed.protocol !== "https:") throw new CanvasApiError("CANVAS_BASE_URL debe usar HTTPS.", 500);
-  return { baseUrl, token };
-}
-
-function syncSecretConfig(): string {
-  const secret = process.env.CANVAS_SYNC_SECRET?.trim();
-  if (!secret) {
-    throw new CanvasApiError(
-      "Falta configurar CANVAS_SYNC_SECRET en el servidor. Agrégala a .env.local y reinicia npm run dev.",
-      503,
-    );
+  if (new URL(baseUrl).protocol !== "https:") {
+    throw new CanvasApiError("CANVAS_BASE_URL debe usar HTTPS.", 500);
   }
-  return secret;
-}
-
-function hasValidSyncSecret(request: Request): boolean {
-  const expected = syncSecretConfig();
-  const received = request.headers.get("x-canvas-sync-secret")?.trim() ?? "";
-  if (!received) return false;
-  const expectedBytes = Buffer.from(expected);
-  const receivedBytes = Buffer.from(received);
-  return expectedBytes.length === receivedBytes.length && timingSafeEqual(expectedBytes, receivedBytes);
+  return baseUrl;
 }
 
 function nextLink(link: string | null): string | null {
@@ -56,11 +39,11 @@ function nextLink(link: string | null): string | null {
   return match?.match(/<([^>]+)>/)?.[1] ?? null;
 }
 
-async function canvasRequest<T>(pathOrUrl: string): Promise<{ data: T; next: string | null }> {
-  const { baseUrl, token } = canvasConfig();
+async function canvasRequest<T>(pathOrUrl: string, token: string): Promise<{ data: T; next: string | null }> {
+  const baseUrl = canvasBaseUrl();
   const url = pathOrUrl.startsWith("http") ? pathOrUrl : `${baseUrl}${pathOrUrl}`;
   if (new URL(url).origin !== new URL(baseUrl).origin) {
-    throw new CanvasApiError("Canvas devolvio una URL de paginacion no permitida.", 502);
+    throw new CanvasApiError("Canvas devolvió una URL de paginación no permitida.", 502);
   }
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -69,19 +52,19 @@ async function canvasRequest<T>(pathOrUrl: string): Promise<{ data: T; next: str
   });
   if (!response.ok) {
     const message = response.status === 401
-      ? "El token de Canvas no es valido o fue revocado."
-      : `Canvas respondio con el estado ${response.status}.`;
-    throw new CanvasApiError(message, 502);
+      ? "Canvas rechazó el token. Revísalo o genera uno nuevo en Aula Virtual."
+      : `Canvas respondió con el estado ${response.status}.`;
+    throw new CanvasApiError(message, response.status === 401 ? 401 : 502);
   }
   return { data: (await response.json()) as T, next: nextLink(response.headers.get("link")) };
 }
 
-async function canvasList<T>(path: string): Promise<T[]> {
+async function canvasList<T>(path: string, token: string): Promise<T[]> {
   const output: T[] = [];
   let next: string | null = path;
   let pages = 0;
   while (next && pages < 20) {
-    const page: { data: T[]; next: string | null } = await canvasRequest<T[]>(next);
+    const page: { data: T[]; next: string | null } = await canvasRequest<T[]>(next, token);
     output.push(...page.data);
     next = page.next;
     pages += 1;
@@ -89,13 +72,14 @@ async function canvasList<T>(path: string): Promise<T[]> {
   return output;
 }
 
-async function assignmentsForCourses(courses: CanvasCourse[]) {
+async function assignmentsForCourses(courses: CanvasCourse[], token: string) {
   const result = new Map<number, CanvasAssignment[]>();
   for (let start = 0; start < courses.length; start += 5) {
     const batch = courses.slice(start, start + 5);
     await Promise.all(batch.map(async (course) => {
       const assignments = await canvasList<CanvasAssignment>(
         `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
+        token,
       );
       result.set(course.id, assignments);
     }));
@@ -103,34 +87,67 @@ async function assignmentsForCourses(courses: CanvasCourse[]) {
   return result;
 }
 
+function errorResponse(error: unknown) {
+  const status = error instanceof CanvasApiError || error instanceof CanvasTokenVaultError
+    ? error.status
+    : 500;
+  const message = error instanceof Error ? error.message : "No se pudo sincronizar con Canvas.";
+  return NextResponse.json({ error: message }, { status });
+}
+
+export async function GET(request: Request) {
+  try {
+    const userId = await authenticatedUserId(request);
+    if (!userId) return NextResponse.json({ connected: false });
+    return NextResponse.json({ connected: await hasStoredCanvasToken(userId) });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const userId = await authenticatedUserId(request);
+    if (!userId) throw new CanvasApiError("Debes conectar Supabase para eliminar el token guardado.", 401);
+    await deleteCanvasToken(userId);
+    return NextResponse.json({ connected: false });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    if (!hasValidSyncSecret(request)) {
-      return NextResponse.json(
-        {
-          error:
-            "La clave de sincronización no coincide con CANVAS_SYNC_SECRET. No escribas aquí el token de Canvas.",
-        },
-        { status: 401 },
-      );
+    const body = await request.json().catch(() => ({})) as { canvasToken?: unknown; remember?: unknown };
+    const providedToken = typeof body.canvasToken === "string" ? body.canvasToken.trim() : "";
+    if (providedToken.length > 4096) throw new CanvasApiError("El token de Canvas es demasiado largo.", 400);
+
+    const userId = await authenticatedUserId(request);
+    const remember = body.remember === true;
+    if (remember && !userId) {
+      throw new CanvasApiError("Conecta Supabase para guardar el token cifrado.", 400);
     }
+
+    const token = providedToken || (userId ? await loadCanvasToken(userId) : null);
+    if (!token) throw new CanvasApiError("Escribe tu token personal de Canvas para sincronizar.", 400);
+
     const [profileResponse, courses] = await Promise.all([
-      canvasRequest<CanvasProfile>("/api/v1/users/self/profile"),
+      canvasRequest<CanvasProfile>("/api/v1/users/self/profile", token),
       canvasList<CanvasCourse>(
         "/api/v1/courses?per_page=100&enrollment_state=active&include[]=term&include[]=teachers&include[]=total_scores",
+        token,
       ),
     ]);
     if (courses.length === 0) {
-      return NextResponse.json(
-        { error: "Canvas no devolvió materias activas; no se modificaron tus datos locales." },
-        { status: 422 },
-      );
+      throw new CanvasApiError("Canvas no devolvió materias activas; no se modificaron tus datos locales.", 422);
     }
-    const assignments = await assignmentsForCourses(courses);
+    const assignments = await assignmentsForCourses(courses, token);
+
+    if (userId && remember && providedToken) await saveCanvasToken(userId, providedToken);
+    else if (userId && !providedToken) await markCanvasTokenSynced(userId);
+
     return NextResponse.json(normalizeCanvasData(profileResponse.data, courses, assignments));
   } catch (error) {
-    const status = error instanceof CanvasApiError ? error.status : 500;
-    const message = error instanceof Error ? error.message : "No se pudo sincronizar con Canvas.";
-    return NextResponse.json({ error: message }, { status });
+    return errorResponse(error);
   }
 }
