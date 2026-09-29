@@ -5,11 +5,9 @@ import { format, parseISO } from "date-fns";
 import { BookOpen, Plus } from "lucide-react";
 
 import { useSemesterData } from "@/hooks/useSemesterData";
-import { useAppStore } from "@/store/app";
 import {
   attendanceForCourse,
   courseClassroom,
-  courseProfessor,
   courseSchedules,
   tasksForCourse,
 } from "@/lib/selectors";
@@ -58,7 +56,7 @@ export default function CoursesPage() {
     <div className="mx-auto w-full max-w-6xl space-y-6">
       <PageHeader
         title="Materias"
-subtitle={
+        subtitle={
             semester
               ? `${semester.label} · ${semester.startsAt.slice(0, 4)}`
               : "Organiza tus materias del semestre"
@@ -88,7 +86,7 @@ subtitle={
               key={course.id}
               course={course}
               schedules={courseSchedules(schedules, course.id)}
-              professor={courseProfessor(professors, course.professorId)}
+              professors={professors}
               classroom={courseClassroom(classrooms, course.classroomId)}
               attendance={extras[course.id]?.attendance}
               pendingTasks={extras[course.id]?.pendingTasks ?? 0}

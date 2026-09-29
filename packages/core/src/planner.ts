@@ -7,10 +7,15 @@ export interface Semester {
 export interface Professor { id: ID; name: string; email: string; title: string }
 export interface Classroom { id: ID; name: string; building: string }
 export type CourseColor = "indigo" | "sky" | "emerald" | "amber" | "rose" | "violet" | "slate";
+export type CourseSectionKind = "theory" | "practice" | "other";
+export interface CourseSection {
+  id: ID; kind: CourseSectionKind; label: string; name: string; code: string;
+  professorIds: ID[]; externalId: string; externalUrl: string | null;
+}
 export interface Course {
   id: ID; semesterId: ID; code: string; name: string; professorId: ID; classroomId: ID;
   color: CourseColor; credits: number; notionUrl: string | null; source?: "local" | "canvas";
-  externalId?: string; externalUrl?: string | null;
+  externalId?: string; externalUrl?: string | null; sections?: CourseSection[];
 }
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export interface CourseSchedule { id: ID; courseId: ID; weekday: Weekday; startTime: string; endTime: string }

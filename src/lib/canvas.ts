@@ -4,6 +4,8 @@ import type {
   CanvasSyncPayload,
   Course,
   CourseColor,
+  CourseSection,
+  CourseSectionKind,
   Grade,
   Professor,
   Semester,
@@ -118,6 +120,41 @@ function priorityFor(dueAt: string | null | undefined): TaskPriority {
   return "low";
 }
 
+function folded(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function sectionKind(course: CanvasCourse): CourseSectionKind {
+  const value = folded(`${course.name ?? ""} ${course.course_code ?? ""}`);
+  if (/\b(practica|practico|pract|prac|laboratorio|lab)\b/.test(value) || /[-_\s](p|pra)$/.test(value)) return "practice";
+  if (/\b(teoria|teorico|teorica|teo)\b/.test(value) || /[-_\s]t$/.test(value)) return "theory";
+  return "other";
+}
+
+function withoutSection(value: string | undefined): string {
+  return (value ?? "")
+    .replace(/[([]?\s*\b(teor[ií]a|te[oó]ric[oa]|teo|pr[aá]ctic[oa]|pract|prac|laboratorio|lab)\b\s*[)\]]?/gi, " ")
+    .replace(/\s*[-–—|/]\s*[TP]\s*$/i, "")
+    .replace(/\s*[-–—|/]\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function academicCode(course: CanvasCourse): string | null {
+  const value = `${course.course_code ?? ""} ${course.name ?? ""}`.toUpperCase();
+  return value.match(/\b[A-Z]{3,6}\d{3,5}\b/)?.[0] ?? null;
+}
+
+function stableSlug(value: string): string {
+  return folded(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64) || "materia";
+}
+
+function sectionLabel(kind: CourseSectionKind): string {
+  if (kind === "theory") return "Teoría";
+  if (kind === "practice") return "Práctica";
+  return "Sección";
+}
+
 export function normalizeCanvasData(
   profile: CanvasProfile,
   canvasCourses: CanvasCourse[],
@@ -129,7 +166,7 @@ export function normalizeCanvasData(
 
   const termMap = new Map<string, Semester>();
   for (const course of canvasCourses) {
-    const externalId = String(course.term?.id ?? `course-${course.id}`);
+    const externalId = String(course.term?.id ?? "active");
     const id = `canvas-semester-${externalId}`;
     if (!termMap.has(id)) {
       termMap.set(id, {
@@ -145,30 +182,71 @@ export function normalizeCanvasData(
   }
 
   const professorMap = new Map<string, Professor>();
-  const courses: Course[] = canvasCourses.map((course, index) => {
-    const teacher = course.teachers?.[0];
-    const professorId = teacher ? `canvas-professor-${teacher.id}` : "";
-    if (teacher && !professorMap.has(professorId)) {
-      professorMap.set(professorId, {
-        id: professorId,
-        name: teacher.display_name?.trim() || "Docente Canvas",
-        email: "",
-        title: "",
-      });
+  const grouped = new Map<string, { code: string; name: string; semesterId: string; raw: CanvasCourse[] }>();
+  for (const course of canvasCourses) {
+    for (const teacher of course.teachers ?? []) {
+      const professorId = `canvas-professor-${teacher.id}`;
+      if (!professorMap.has(professorId)) {
+        professorMap.set(professorId, {
+          id: professorId,
+          name: teacher.display_name?.trim() || "Docente Canvas",
+          email: "",
+          title: "",
+        });
+      }
     }
+    const semesterId = `canvas-semester-${course.term?.id ?? "active"}`;
+    const normalizedCode = academicCode(course) ?? withoutSection(course.course_code);
+    const code = normalizedCode || `CANVAS-${course.id}`;
+    const name = withoutSection(course.name) || "Materia sin nombre";
+    const identity = academicCode(course) ?? stableSlug(name);
+    const key = `${semesterId}:${folded(identity)}`;
+    const current = grouped.get(key);
+    if (current) current.raw.push(course);
+    else grouped.set(key, { code, name, semesterId, raw: [course] });
+  }
+
+  const courseIdByCanvasId = new Map<number, string>();
+  const courses: Course[] = [...grouped.values()].map((group, index) => {
+    const kindsSeen = new Map<CourseSectionKind, number>();
+    const sections: CourseSection[] = group.raw
+      .sort((a, b) => {
+        const order = { theory: 0, practice: 1, other: 2 };
+        return order[sectionKind(a)] - order[sectionKind(b)] || a.id - b.id;
+      })
+      .map((course) => {
+        const kind = sectionKind(course);
+        const occurrence = (kindsSeen.get(kind) ?? 0) + 1;
+        kindsSeen.set(kind, occurrence);
+        const baseLabel = sectionLabel(kind);
+        return {
+          id: `canvas-section-${course.id}`,
+          kind,
+          label: occurrence > 1 ? `${baseLabel} ${occurrence}` : baseLabel,
+          name: course.name?.trim() || group.name,
+          code: course.course_code?.trim() || group.code,
+          professorIds: (course.teachers ?? []).map((teacher) => `canvas-professor-${teacher.id}`),
+          externalId: String(course.id),
+          externalUrl: course.html_url ?? null,
+        };
+      });
+    const identity = academicCode(group.raw[0]) ?? stableSlug(group.name);
+    const id = `canvas-course-${group.semesterId.replace("canvas-semester-", "")}-${stableSlug(identity)}`;
+    for (const raw of group.raw) courseIdByCanvasId.set(raw.id, id);
     return {
-      id: `canvas-course-${course.id}`,
-      semesterId: `canvas-semester-${course.term?.id ?? `course-${course.id}`}`,
-      code: course.course_code?.trim() || `CANVAS-${course.id}`,
-      name: course.name?.trim() || "Materia sin nombre",
-      professorId,
+      id,
+      semesterId: group.semesterId,
+      code: group.code,
+      name: group.name,
+      professorId: sections.flatMap((section) => section.professorIds)[0] ?? "",
       classroomId: "",
       color: COLORS[index % COLORS.length],
       credits: 0,
       notionUrl: null,
       source: "canvas",
-      externalId: String(course.id),
-      externalUrl: course.html_url ?? null,
+      externalId: group.raw.map((course) => course.id).join(","),
+      externalUrl: sections[0]?.externalUrl ?? null,
+      sections,
     };
   });
 
@@ -184,7 +262,7 @@ export function normalizeCanvasData(
       const assessmentId = `canvas-assessment-${assignment.id}`;
       tasks.push({
         id: taskId,
-        courseId: `canvas-course-${course.id}`,
+        courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
         title: assignment.name?.trim() || "Actividad de Canvas",
         description: stripHtml(assignment.description),
         dueDate: date,
@@ -198,7 +276,7 @@ export function normalizeCanvasData(
       });
       assessments.push({
         id: assessmentId,
-        courseId: `canvas-course-${course.id}`,
+        courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
         name: assignment.name?.trim() || "Actividad de Canvas",
         kind: assignmentKind(assignment),
         date,
@@ -215,7 +293,7 @@ export function normalizeCanvasData(
         grades.push({
           id: `canvas-grade-${assignment.id}`,
           assessmentId,
-          courseId: `canvas-course-${course.id}`,
+          courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
           score: Math.max(0, Math.min(100, (score / possible) * 100)),
           note: `${score}/${possible} puntos en Canvas`,
           source: "canvas",

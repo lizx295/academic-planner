@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/Progress";
 interface CourseCardProps {
   course: Course;
   schedules: CourseSchedule[];
-  professor?: Professor;
+  professors: Professor[];
   classroom?: Classroom;
   attendance?: AttendanceStat;
   pendingTasks: number;
@@ -24,7 +24,7 @@ interface CourseCardProps {
 export function CourseCard({
   course,
   schedules,
-  professor,
+  professors,
   classroom,
   attendance,
   pendingTasks,
@@ -35,11 +35,14 @@ export function CourseCard({
     .map((s) => s.weekday)
     .sort((a, b) => [1, 2, 3, 4, 5, 6, 0].indexOf(a) - [1, 2, 3, 4, 5, 6, 0].indexOf(b));
   const occurrences = weekdays.map((w) => WEEKDAY_SHORT[w]).join(" · ");
+  const professorById = new Map(professors.map((item) => [item.id, item]));
+  const professor = professorById.get(course.professorId);
+  const showSections = (course.sections?.length ?? 0) > 1;
 
   return (
     <Link
       href={`/courses/${course.id}`}
-      className="surface-card group relative block overflow-hidden p-4 transition-colors duration-150 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="surface-card group relative block h-full overflow-hidden p-4 transition-colors duration-150 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <span
         aria-hidden="true"
@@ -53,7 +56,7 @@ export function CourseCard({
               {course.code}
             </p>
           </div>
-          <h3 className="mt-1 truncate text-[15px] font-semibold tracking-tight text-text">
+          <h3 className="mt-1 break-words pr-1 text-[15px] font-semibold leading-snug tracking-tight text-text">
             {course.name}
           </h3>
         </div>
@@ -64,8 +67,28 @@ export function CourseCard({
         />
       </div>
 
+      {showSections ? (
+        <div className="mt-4 grid grid-cols-2 gap-2 pl-2">
+          {course.sections?.map((section) => {
+            const sectionProfessors = section.professorIds
+              .map((id) => professorById.get(id))
+              .filter((item): item is Professor => Boolean(item));
+            return (
+              <div key={section.id} className="min-w-0 rounded-xl border border-border bg-surface-subtle/60 p-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-accent">{section.label}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-muted">
+                  {sectionProfessors.length > 0
+                    ? sectionProfessors.map((item) => `${item.title ? `${item.title} ` : ""}${item.name}`).join(", ")
+                    : "Docente no informado"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="mt-3 space-y-1.5 pl-2 text-[13px] text-text-muted">
-        {professor ? (
+        {!showSections && professor ? (
           <p className="flex items-center gap-2">
             <User size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
             <span className="truncate">
@@ -73,12 +96,12 @@ export function CourseCard({
               {professor.name}
             </span>
           </p>
-        ) : (
+        ) : !showSections ? (
           <p className="flex items-center gap-2">
             <User size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
             <span>Sin profesor asignado</span>
           </p>
-        )}
+        ) : null}
         {occurrences ? (
           <p className="flex items-center gap-2">
             <CalendarClock size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
@@ -93,26 +116,26 @@ export function CourseCard({
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 pl-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[13px] text-text-muted">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_100px] items-center gap-2 pl-2">
+        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-[13px] text-text-muted">
             <ClipboardList size={14} className="text-text-faint" aria-hidden="true" />
             {pendingTasks > 0 ? `${pendingTasks} tarea${pendingTasks === 1 ? "" : "s"}` : "Sin tareas"}
           </span>
           {nextAssessment ? <Badge tone="accent">{nextAssessment}</Badge> : null}
         </div>
         {attendance && attendance.total > 0 ? (
-          <div className="flex w-[108px] shrink-0 items-center gap-2">
+          <div className="flex w-[100px] shrink-0 items-center gap-1.5">
             <Progress
               value={attendance.percent ?? 0}
               tone={attendance.percent === null || attendance.percent >= 80 ? "success" : "warning"}
               className="h-1.5"
             />
-            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-text-muted">
+            <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-text-muted">
               {attendance.percent ?? "–"}%
             </span>
           </div>
-        ) : null}
+        ) : <span aria-hidden="true" />}
       </div>
     </Link>
   );

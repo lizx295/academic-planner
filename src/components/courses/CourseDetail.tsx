@@ -178,6 +178,7 @@ export default function CourseDetailPage() {
 
   const cls = courseColorClasses(course.color);
   const professor = courseProfessor(professors, course.professorId);
+  const professorById = new Map(professors.map((item) => [item.id, item]));
   const classroom = courseClassroom(classrooms, course.classroomId);
   const semester = semesters.find((s) => s.id === course.semesterId);
   const nextAssessment = courseAssessments
@@ -239,6 +240,37 @@ export default function CourseDetailPage() {
                 {course.credits} {course.credits === 1 ? "crédito" : "créditos"}
               </span>
             </div>
+            {(course.sections?.length ?? 0) > 1 ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {course.sections?.map((section) => {
+                  const names = section.professorIds
+                    .map((id) => professorById.get(id))
+                    .filter(Boolean)
+                    .map((item) => `${item?.title ? `${item.title} ` : ""}${item?.name ?? ""}`);
+                  return (
+                    <div key={section.id} className="min-w-0 rounded-xl border border-border bg-surface-subtle/60 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{section.label}</p>
+                        {section.externalUrl ? (
+                          <a
+                            href={section.externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 text-text-faint transition-colors hover:text-accent"
+                            aria-label={`Abrir ${section.label} en Canvas`}
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 break-words text-xs leading-relaxed text-text-muted">
+                        {names.length > 0 ? names.join(", ") : "Docente no informado"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <Button size="sm" onClick={() => setFormOpen(true)}>
@@ -620,7 +652,6 @@ export default function CourseDetailPage() {
 
         {tab === "workspace" ? (
           <WorkspaceSection
-            courseId={course.id}
             courseName={course.name}
             courseColor={course.color}
             workspace={workspace}
@@ -715,14 +746,12 @@ function courseAttRecords(records: AttendanceRecord[], courseId: string): Attend
 }
 
 function WorkspaceSection({
-  courseId,
   courseName,
   courseColor,
   workspace,
   onEdit,
   onConnect,
 }: {
-  courseId: string;
   courseName: string;
   courseColor: CourseColor;
   workspace?: { title: string; pageUrl: string; integration: "manual" | "api" } | null;

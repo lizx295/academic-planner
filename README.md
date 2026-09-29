@@ -199,6 +199,13 @@ planificador. En la primera sincronizacion reemplaza los datos demo; en las
 siguientes actualiza solo los elementos cuyo origen es Canvas y conserva lo
 creado manualmente.
 
+Cuando Canvas publica componentes teórico y práctico por separado, el
+normalizador los agrupa por periodo y código académico. La interfaz muestra una
+sola materia con bloques independientes de **Teoría** y **Práctica**, pero
+conserva los docentes, enlaces, tareas y calificaciones de ambos componentes.
+Después de actualizar esta versión basta con sincronizar Canvas nuevamente para
+reemplazar las tarjetas separadas existentes.
+
 ## Conectar Supabase con Vercel y desplegar
 
 ### 1. Preparar el repositorio
