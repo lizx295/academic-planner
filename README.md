@@ -2,12 +2,17 @@
 
 Centro academico personal en espanol para materias, calendario, tareas,
 evaluaciones, notas, asistencia y materiales. Se integra con Canvas LMS (Aula
-Virtual ESPOL), guarda un respaldo privado en Supabase y se despliega como una
-sola aplicacion Next.js en Vercel.
+Virtual ESPOL), guarda un respaldo privado en Supabase y ofrece dos clientes:
+la aplicacion web desplegable en Vercel y una aplicacion movil Expo/React Native.
 
 ## Arquitectura
 
 - **Web y API:** Next.js 16, React 19 y Route Handlers server-side.
+- **Movil:** Expo SDK 57, React Native 0.86 y Expo Router para Android, iOS y
+  una vista web de desarrollo.
+- **Nucleo compartido:** `packages/core` contiene tipos, colores y reglas de
+  combinacion de datos. Web y movil consumen el mismo paquete para evitar que
+  las reglas de negocio diverjan.
 - **Estado local:** Zustand con `localStorage`, disponible aun sin conexion.
 - **Nube:** Supabase Auth anonimo + PostgreSQL con RLS. Cada usuario solo puede
   leer y modificar su propia fila en `planner_states`.
@@ -17,6 +22,15 @@ sola aplicacion Next.js en Vercel.
 
 El backend FastAPI de `backend/` se conserva como referencia historica, pero ya
 no es necesario para el despliegue principal en Vercel.
+
+```text
+academic-planner/
+├── src/                 # aplicacion web Next.js y API segura
+├── apps/mobile/         # aplicacion Expo / React Native
+├── packages/core/       # dominio y tema compartidos
+├── supabase/            # migraciones PostgreSQL y RLS
+└── backend/             # referencia historica
+```
 
 ## Desarrollo local
 
@@ -34,6 +48,7 @@ Comprobaciones disponibles:
 npm run typecheck
 npm run lint
 npm run build
+npm run typecheck:mobile
 ```
 
 Sin variables de Supabase la aplicacion sigue funcionando solo con
@@ -294,3 +309,113 @@ y [despliegues Git en Vercel](https://vercel.com/docs/git).
 Desde Configuracion tambien se pueden importar archivos ICS, CSV de tareas y
 respaldos JSON, o exportar el estado completo. El respaldo local permanece
 activo incluso cuando Supabase esta configurado.
+
+## Aplicacion movil con React Native
+
+La app de `apps/mobile` conserva el lenguaje visual actual: las mismas paletas
+clara y oscura, tarjetas redondeadas, acento violeta, estados de tareas y cinco
+secciones principales. No reemplaza la web ni cambia el despliegue de Vercel;
+es un segundo cliente del mismo sistema.
+
+### Preparar el entorno movil
+
+1. Instala todas las dependencias desde la raiz del repositorio. Los workspaces
+   de npm enlazan automaticamente `apps/mobile` con `packages/core`:
+
+   ```bash
+   npm install
+   ```
+
+2. Crea el archivo local de la app movil:
+
+   ```bash
+   cp apps/mobile/.env.example apps/mobile/.env.local
+   ```
+
+3. Completa las variables publicas:
+
+   ```dotenv
+   EXPO_PUBLIC_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_REEMPLAZAR
+   EXPO_PUBLIC_WEB_API_URL=https://TU-PROYECTO.vercel.app
+   ```
+
+   Las dos primeras deben apuntar al mismo proyecto Supabase que usa la web.
+   La tercera apunta al despliegue Vercel que contiene `/api/canvas/sync`. En un
+   telefono fisico no uses `localhost`: usa la URL de Vercel o una URL HTTPS
+   accesible desde el dispositivo.
+
+4. Inicia Expo:
+
+   ```bash
+   npm run mobile
+   ```
+
+   Escanea el QR con Expo Go o usa los accesos directos:
+
+   ```bash
+   npm run mobile:android
+   npm run mobile:ios
+   npm run mobile:web
+   ```
+
+5. Antes de crear una compilacion valida ambos clientes:
+
+   ```bash
+   npm run typecheck
+   npm run typecheck:mobile
+   npm run build
+   npm run export --workspace @academic-planner/mobile -- --platform web
+   ```
+
+### Relacion entre movil, Vercel, Canvas y Supabase
+
+```text
+Web Next.js ───────────────┐
+                          ├── Supabase Auth + planner_states
+App Expo / React Native ──┘
+          │
+          └── POST /api/canvas/sync en Vercel ── Canvas LMS
+                                                    (token solo en servidor)
+```
+
+La app movil nunca incluye `CANVAS_ACCESS_TOKEN`. En **Mas > Aula Virtual
+ESPOL**, el usuario escribe `CANVAS_SYNC_SECRET`; la app lo envia por HTTPS al
+Route Handler de Vercel, recibe datos normalizados y los combina mediante las
+mismas reglas que usa la web. La clave no se guarda en AsyncStorage.
+
+Las variables con prefijo `EXPO_PUBLIC_` se incorporan al bundle y, por tanto,
+no son secretos. Solo deben contener la URL y la clave publicable de Supabase,
+ademas de la URL publica de Vercel. Los secretos de Canvas permanecen
+exclusivamente en Vercel.
+
+> **Identidad entre dispositivos:** web y movil usan actualmente sesiones
+> anonimas independientes. Aunque apunten a la misma base, cada instalacion
+> obtiene su propio `user_id` y su propia fila. Para que una misma persona vea
+> exactamente el mismo estado en ambos clientes, el siguiente paso es habilitar
+> acceso recuperable por correo u OAuth en Supabase y usar esa misma cuenta en
+> web y movil. La estructura compartida ya esta preparada para ese cambio.
+
+### Compilar Android e iOS con EAS
+
+Desde `apps/mobile`, autentica y configura el proyecto una sola vez:
+
+```bash
+cd apps/mobile
+npx eas-cli login
+npx eas-cli build:configure
+```
+
+Configura las tres variables `EXPO_PUBLIC_*` en los entornos de EAS y crea las
+compilaciones con:
+
+```bash
+npx eas-cli build --platform android
+npx eas-cli build --platform ios
+```
+
+La compilacion iOS requiere una cuenta Apple Developer para distribuirse; la
+de Android puede generar primero una version interna para pruebas. Consulta la
+[guia oficial de monorepos de Expo](https://docs.expo.dev/guides/monorepos/) y
+la [documentacion de EAS Build](https://docs.expo.dev/build/introduction/) para
+registrar los identificadores y credenciales definitivos.
