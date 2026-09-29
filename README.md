@@ -1,101 +1,89 @@
 # Academic Planner
 
-Planificador académico todo en uno: materias, horarios, asistencia, tareas,
-evaluaciones, calificaciones, materiales y workspace por materia. La UI está
-en español y los datos se guardan localmente en el navegador.
+Centro academico personal en espanol para materias, calendario, tareas,
+evaluaciones, notas, asistencia y materiales. Se integra con Canvas LMS (Aula
+Virtual ESPOL), guarda un respaldo privado en Supabase y se despliega como una
+sola aplicacion Next.js en Vercel.
 
-- Web: Next.js 16, React 19, Tailwind CSS v4, zustand, date-fns, lucide-react.
-- API (respaldo futuro): FastAPI + SQLAlchemy 2 + PostgreSQL.
-- Integración Notion: v1 usa un campo de URL por materia (sin API real).
+## Arquitectura
 
-## Requisitos
+- **Web y API:** Next.js 16, React 19 y Route Handlers server-side.
+- **Estado local:** Zustand con `localStorage`, disponible aun sin conexion.
+- **Nube:** Supabase Auth anonimo + PostgreSQL con RLS. Cada usuario solo puede
+  leer y modificar su propia fila en `planner_states`.
+- **Canvas LMS:** el servidor usa `Authorization: Bearer`; el token nunca se
+  expone al navegador ni se guarda en Supabase. Una clave independiente
+  protege el endpoint de sincronizacion del despliegue publico.
 
-- Node.js >= 20 (se probó con Node 20/22 y npm 11)
-- Python >= 3.12 (opcional, solo para la API)
-- Docker + Docker Compose (opcional, para el modo completo)
+El backend FastAPI de `backend/` se conserva como referencia historica, pero ya
+no es necesario para el despliegue principal en Vercel.
 
-## Scripts
+## Desarrollo local
 
-```bash
-npm install          # instala dependencias
-npm run dev          # servidor de desarrollo en http://localhost:3000
-npm run typecheck    # tsc --noEmit
-npm run build        # build de producción
-npm start            # sirve el build de producción
-```
-
-## Estructura
-
-```
-src/
-  app/           # páginas (materias, calendario, asistencia, tareas, ...)
-  components/    # UI compartida (nav, diálogos, filas, tarjetas)
-  hooks/         # useSemesterData (selectores del semestre activo)
-  lib/           # store zustand, seed, selectores, importadores, navegación
-  types/         # tipos del dominio
-  styles/
-backend/         # API FastAPI (salud, semestres, snapshots de respaldo)
-```
-
-## Datos y almacenamiento
-
-Los datos se guardan en `localStorage` bajo la clave `academic-planner-store`
-(store zustand con persist). Al abrir la app por primera vez se genera un
-semestre demo con datos de ejemplo relativos a la fecha actual; puedes
-borrarlos desde Configuración.
-
-El idioma de la interfaz es español y los iconos son SVG (lucide-react).
-
-## Configuración
-
-- Tema claro / oscuro: conmutador en `src/app/settings/page.tsx`; aplica la
-  clase `dark` en `<html>`.
-- Rutas del menú: `src/lib/nav.ts` (sidebar en escritorio, bottom nav en móvil).
-
-## Importación de datos
-
-Desde Configuración -> Importar puedes cargar:
-
-- Respaldos JSON de la propia app (estructura `data.json` exportable).
-- Archivos ICS generados por Google Calendar/Notion (eventos recurrentes
-  semanales con RRULE WKST=SU; se detectan los días de clase y se crean los
-  horarios de las materias).
-- CSV de tareas (`title,due_date,due_time,course,pdf|html`).
-
-Los importadores viven en `src/lib/importers.ts`.
-
-## API (v1) y Docker
-
-La API expone hasta ahora: `GET /api/health`, CRUD base de semestres y
-respaldos (`POST /api/data/snapshot`, `GET /api/data/snapshots/latest`).
-La sincronización completa de materias/tareas/asistencia llega en una
-versión futura.
-
-Para levantar frontend + API + PostgreSQL:
+Requiere Node.js 20 o superior.
 
 ```bash
-docker compose up --build
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-- Web: http://localhost:3000
-- API: http://localhost:8000 (docs en /docs)
-
-Para correr la API localmente sin Docker:
+Comprobaciones disponibles:
 
 ```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-AP_DATABASE_URL=sqlite:///./api.db uvicorn app.main:app --reload
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-## Migraciones (Alembic)
+Sin variables de Supabase la aplicacion sigue funcionando solo con
+`localStorage`. Sin `CANVAS_ACCESS_TOKEN`, la interfaz funciona normalmente y
+la sincronizacion de Canvas muestra un aviso de configuracion.
 
-En desarrollo las tablas se crean automáticamente al arrancar la API. En
-producción usa Alembic:
+## Configurar Supabase
 
-```bash
-cd backend
-alembic revision --autogenerate -m "inicial"
-alembic upgrade head
-```
+1. Crea un proyecto en Supabase.
+2. En **Authentication > Providers > Anonymous**, habilita usuarios anonimos.
+3. Ejecuta en el SQL Editor el archivo
+   `supabase/migrations/202609280001_planner_states.sql`.
+4. Copia la URL y la clave anon/publishable a `NEXT_PUBLIC_SUPABASE_URL` y
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+La migracion activa RLS y crea politicas para `select`, `insert`, `update` y
+`delete` basadas en `auth.uid()`. No hace falta exponer una service-role key.
+
+## Configurar Canvas ESPOL
+
+1. Revoca cualquier token que haya sido compartido por chat, URL, captura o
+   historial, y genera uno nuevo en la configuracion de Canvas.
+2. Guarda el token nuevo como `CANVAS_ACCESS_TOKEN` solo en `.env.local` y en
+   las variables privadas de Vercel.
+3. Genera otra clave larga y aleatoria para `CANVAS_SYNC_SECRET`. Esta clave no
+   es el token de Canvas: solo autoriza el boton de sincronizacion.
+4. Mantiene `CANVAS_BASE_URL=https://aulavirtual.espol.edu.ec`.
+5. Abre **Configuracion > Canvas ESPOL y nube**, escribe la clave de
+   sincronizacion y pulsa **Sincronizar ahora**.
+
+La ruta `POST /api/canvas/sync` obtiene el perfil, los cursos activos y sus
+actividades. Sigue el encabezado `Link` de Canvas para paginacion, trae las
+entregas del estudiante y transforma las notas a la escala 0-100 usada por el
+planificador. En la primera sincronizacion reemplaza los datos demo; en las
+siguientes actualiza solo los elementos cuyo origen es Canvas y conserva lo
+creado manualmente.
+
+## Desplegar en Vercel
+
+1. Importa el repositorio en Vercel (Framework Preset: **Next.js**).
+2. Agrega las cinco variables de `.env.example` en **Project Settings >
+   Environment Variables**. Usa el token nuevo, nunca uno expuesto.
+3. Despliega. No se necesita Docker, un servidor Python ni una base PostgreSQL
+   separada.
+
+Para probar un build de produccion antes de subir cambios ejecuta `npm run
+build`.
+
+## Importacion y respaldo manual
+
+Desde Configuracion tambien se pueden importar archivos ICS, CSV de tareas y
+respaldos JSON, o exportar el estado completo. El respaldo local permanece
+activo incluso cuando Supabase esta configurado.
