@@ -182,6 +182,12 @@ regrese la conexión.
 5. Abre **Configuracion > Canvas ESPOL y nube**, escribe la clave de
    sincronizacion y pulsa **Sincronizar ahora**.
 
+En desarrollo local debes crear `.env.local` (no basta con editar
+`.env.example`) y reiniciar `npm run dev` después de cambiar cualquier variable.
+El campo de la interfaz recibe el valor de `CANVAS_SYNC_SECRET`; el valor de
+`CANVAS_ACCESS_TOKEN` se guarda únicamente en el archivo o en Vercel y nunca se
+escribe en la pantalla.
+
 La ruta `POST /api/canvas/sync` obtiene el perfil, los cursos activos y sus
 actividades. Sigue el encabezado `Link` de Canvas para paginacion, trae las
 entregas del estudiante y transforma las notas a la escala 0-100 usada por el

@@ -23,17 +23,28 @@ class CanvasApiError extends Error {
 
 function canvasConfig() {
   const baseUrl = (process.env.CANVAS_BASE_URL || "https://aulavirtual.espol.edu.ec").replace(/\/$/, "");
-  const token = process.env.CANVAS_ACCESS_TOKEN;
+  const token = process.env.CANVAS_ACCESS_TOKEN?.trim();
   if (!token) throw new CanvasApiError("Falta configurar CANVAS_ACCESS_TOKEN en el servidor.", 503);
   const parsed = new URL(baseUrl);
   if (parsed.protocol !== "https:") throw new CanvasApiError("CANVAS_BASE_URL debe usar HTTPS.", 500);
   return { baseUrl, token };
 }
 
+function syncSecretConfig(): string {
+  const secret = process.env.CANVAS_SYNC_SECRET?.trim();
+  if (!secret) {
+    throw new CanvasApiError(
+      "Falta configurar CANVAS_SYNC_SECRET en el servidor. Agrégala a .env.local y reinicia npm run dev.",
+      503,
+    );
+  }
+  return secret;
+}
+
 function hasValidSyncSecret(request: Request): boolean {
-  const expected = process.env.CANVAS_SYNC_SECRET;
-  const received = request.headers.get("x-canvas-sync-secret") ?? "";
-  if (!expected || !received) return false;
+  const expected = syncSecretConfig();
+  const received = request.headers.get("x-canvas-sync-secret")?.trim() ?? "";
+  if (!received) return false;
   const expectedBytes = Buffer.from(expected);
   const receivedBytes = Buffer.from(received);
   return expectedBytes.length === receivedBytes.length && timingSafeEqual(expectedBytes, receivedBytes);
@@ -60,7 +71,7 @@ async function canvasRequest<T>(pathOrUrl: string): Promise<{ data: T; next: str
     const message = response.status === 401
       ? "El token de Canvas no es valido o fue revocado."
       : `Canvas respondio con el estado ${response.status}.`;
-    throw new CanvasApiError(message, response.status === 401 ? 401 : 502);
+    throw new CanvasApiError(message, 502);
   }
   return { data: (await response.json()) as T, next: nextLink(response.headers.get("link")) };
 }
@@ -96,7 +107,10 @@ export async function POST(request: Request) {
   try {
     if (!hasValidSyncSecret(request)) {
       return NextResponse.json(
-        { error: "Clave de sincronizacion incorrecta o no configurada." },
+        {
+          error:
+            "La clave de sincronización no coincide con CANVAS_SYNC_SECRET. No escribas aquí el token de Canvas.",
+        },
         { status: 401 },
       );
     }

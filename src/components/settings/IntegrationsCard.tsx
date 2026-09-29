@@ -76,12 +76,15 @@ export function IntegrationsCard() {
           <Input
             className="mt-3"
             type="password"
-            autoComplete="current-password"
+            autoComplete="off"
             value={syncSecret}
             onChange={(event) => setSyncSecret(event.target.value)}
-            placeholder="Clave de sincronización"
-            aria-label="Clave privada de sincronización"
+            placeholder="Valor de CANVAS_SYNC_SECRET"
+            aria-label="Valor de CANVAS_SYNC_SECRET"
           />
+          <p className="mt-1.5 text-[11px] leading-relaxed text-text-faint">
+            Es la clave que configuraste en <code>.env.local</code> o Vercel; no es el token generado por Canvas.
+          </p>
           <Button className="mt-2 w-full" variant="primary" loading={syncing} disabled={!syncSecret} onClick={syncCanvas}>
             <RefreshCcw size={15} /> {syncing ? "Sincronizando" : "Sincronizar ahora"}
           </Button>
