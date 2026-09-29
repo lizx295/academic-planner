@@ -1,22 +1,25 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { addDays } from "date-fns";
 import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, Plus, Sparkles } from "lucide-react";
 
 import { useAppStore } from "@/store/app";
 import { useSemesterData } from "@/hooks/useSemesterData";
-import type { Task, TaskPriority, TaskStatus } from "@/types";
-import { cn } from "@/lib/utils";
+import type { Task, TaskPriority } from "@/types";
 import { toISODate } from "@/lib/format";
+import { useNow } from "@/hooks/useTheme";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Segmented } from "@/components/ui/Segmented";
+import { Input } from "@/components/ui/Field";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 
 type Filter = "all" | "pending" | "in_progress" | "completed";
+type PeriodFilter = "all" | "today" | "week" | "month" | "date";
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "Todas" },
@@ -25,26 +28,45 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "completed", label: "Completadas" },
 ];
 
+const PERIOD_FILTERS: Array<{ value: PeriodFilter; label: string }> = [
+  { value: "all", label: "Todas" },
+  { value: "today", label: "Hoy" },
+  { value: "week", label: "7 días" },
+  { value: "month", label: "30 días" },
+  { value: "date", label: "Elegir día" },
+];
+
 const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
 
 export default function TasksPage() {
   const { activeTasks, courses, activeCourses } = useSemesterData();
   const deleteTask = useAppStore((s) => s.deleteTask);
   const [filter, setFilter] = useState<Filter>("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
+  const [selectedDate, setSelectedDate] = useState(() => toISODate(new Date()));
   const [form, setForm] = useState<{ open: boolean; task: Task | null }>({
     open: false,
     task: null,
   });
 
-  const now = new Date();
+  const now = useNow(60_000);
   const todayISO = toISODate(now);
+  const weekEndISO = toISODate(addDays(now, 7));
+  const monthEndISO = toISODate(addDays(now, 30));
 
   const visible = useMemo(() => {
-    const list =
+    const byStatus =
       filter === "all"
         ? activeTasks
         : activeTasks.filter((t) => t.status === filter);
-    return list.sort((a, b) => {
+    const list = byStatus.filter((task) => {
+      if (periodFilter === "all") return true;
+      if (periodFilter === "today") return task.dueDate === todayISO;
+      if (periodFilter === "date") return task.dueDate === selectedDate;
+      if (periodFilter === "week") return task.dueDate >= todayISO && task.dueDate <= weekEndISO;
+      return task.dueDate >= todayISO && task.dueDate <= monthEndISO;
+    });
+    return [...list].sort((a, b) => {
       if (a.status === "completed" && b.status !== "completed") return 1;
       if (b.status === "completed" && a.status !== "completed") return -1;
       const diff =
@@ -52,7 +74,7 @@ export default function TasksPage() {
         (a.dueTime ?? "99").localeCompare(b.dueTime ?? "99");
       return diff !== 0 ? diff : PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
     });
-  }, [activeTasks, filter]);
+  }, [activeTasks, filter, periodFilter, selectedDate, todayISO, weekEndISO, monthEndISO]);
 
   const groups = useMemo(() => {
     const g: Array<{ key: string; title: string; icon: ReactNode; items: Task[] }> = [
@@ -92,23 +114,45 @@ export default function TasksPage() {
         }
       />
 
-      <Segmented
-        options={FILTERS}
-        value={filter}
-        onChange={setFilter}
-        ariaLabel="Filtrar tareas"
-        className="w-full sm:w-auto sm:[&>button]:flex-1"
-      />
+      <div className="space-y-3 rounded-2xl border border-border bg-surface p-3 sm:p-4">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="w-24 shrink-0 text-xs font-medium text-text-muted">Estado</span>
+          <Segmented
+            options={FILTERS}
+            value={filter}
+            onChange={setFilter}
+            ariaLabel="Filtrar tareas por estado"
+            className="no-scrollbar max-w-full overflow-x-auto"
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="w-24 shrink-0 text-xs font-medium text-text-muted">Fecha límite</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <Segmented
+              options={PERIOD_FILTERS}
+              value={periodFilter}
+              onChange={setPeriodFilter}
+              ariaLabel="Filtrar tareas por fecha límite"
+              className="no-scrollbar max-w-full overflow-x-auto"
+            />
+            {periodFilter === "date" ? (
+              <Input
+                type="date"
+                aria-label="Día de las tareas"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="w-full sm:w-40"
+              />
+            ) : null}
+          </div>
+        </div>
+      </div>
 
       {total === 0 ? (
         <EmptyState
           icon={<CheckCircle2 size={22} aria-hidden="true" />}
           title={filter === "all" ? "Sin tareas" : "No hay tareas en este filtro"}
-          description={
-            filter === "all"
-              ? "Crea tu primera tarea para no perder ninguna entrega."
-              : "Prueba con otro filtro o crea una tarea nueva."
-          }
+          description="Prueba con otro estado o periodo, o crea una tarea nueva."
           action={
             <Button variant="primary" size="sm" onClick={() => setForm({ open: true, task: null })}>
               <Plus size={14} /> Nueva tarea
