@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useAppStore } from "@/store/app";
 import type { Assessment } from "@/types";
@@ -15,27 +15,25 @@ export interface GradeDialogProps {
 }
 
 export function GradeDialog({ open, onClose, assessment }: GradeDialogProps) {
-  const setGrade = useAppStore((s) => s.setGrade);
   const grades = useAppStore((s) => s.grades);
+  if (!open || !assessment) return null;
+  const existing = grades.find((grade) => grade.assessmentId === assessment.id);
+  return <GradeDialogContent assessment={assessment} existing={existing} onClose={onClose} />;
+}
 
-  const existing = assessment
-    ? grades.find((g) => g.assessmentId === assessment.id)
-    : undefined;
-  const [score, setScore] = useState("");
-  const [note, setNote] = useState("");
+function GradeDialogContent({
+  assessment: a,
+  existing,
+  onClose,
+}: {
+  assessment: Assessment;
+  existing?: { score: number; note: string };
+  onClose: () => void;
+}) {
+  const setGrade = useAppStore((s) => s.setGrade);
+  const [score, setScore] = useState(() => existing ? String(existing.score) : "");
+  const [note, setNote] = useState(() => existing?.note ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!open) return;
-    setScore(existing ? String(existing.score) : "");
-    setNote(existing?.note ?? "");
-    setErrors({});
-  }, [open, assessment, existing]);
-
-  if (!assessment) return null;
-
-  if (!assessment) return null;
-  const a = assessment;
 
   const grade = existing?.score;
   const needs = grade === undefined ? 0 : Math.max(0, 100 - grade);
@@ -52,10 +50,10 @@ export function GradeDialog({ open, onClose, assessment }: GradeDialogProps) {
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
       title={`Calificar: ${a.name}`}
-      description={`Peso ${a.weight}% de la materia.`}
+      description={`Peso efectivo ${Number(a.weight.toFixed(2))}% de la materia${a.gradingGroupName ? ` · ${a.gradingGroupName}${a.gradingGroupWeight != null ? ` (${Number(a.gradingGroupWeight.toFixed(2))}%)` : ""}` : ""}.`}
       size="sm"
       footer={
         <>

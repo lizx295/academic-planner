@@ -36,6 +36,7 @@ export interface CanvasCourse {
   end_at?: string | null;
   workflow_state?: string;
   html_url?: string;
+  apply_assignment_group_weights?: boolean;
   term?: CanvasTerm;
   teachers?: CanvasTeacher[];
 }
@@ -54,8 +55,16 @@ export interface CanvasAssignment {
   due_at?: string | null;
   html_url?: string;
   points_possible?: number | null;
+  assignment_group_id?: number;
+  grading_type?: string;
   submission_types?: string[];
   submission?: CanvasSubmission | null;
+}
+
+export interface CanvasAssignmentGroup {
+  id: number;
+  name?: string;
+  group_weight?: number;
 }
 
 export interface CanvasProfile {
@@ -161,10 +170,74 @@ function sectionLabel(kind: CourseSectionKind): string {
   return "Sección";
 }
 
+interface CanvasWeightInfo {
+  weight: number;
+  groupName?: string;
+  groupWeight?: number;
+}
+
+function assignmentWeights(
+  course: CanvasCourse,
+  assignments: CanvasAssignment[],
+  groups: CanvasAssignmentGroup[],
+): Map<number, CanvasWeightInfo> {
+  const result = new Map<number, CanvasWeightInfo>();
+  const gradable = assignments.filter(
+    (assignment) => assignment.grading_type !== "not_graded" && (assignment.points_possible ?? 0) > 0,
+  );
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const usesGroupWeights = course.apply_assignment_group_weights === true
+    || (course.apply_assignment_group_weights == null
+      && groups.some((group) => (group.group_weight ?? 0) > 0));
+
+  if (usesGroupWeights && groups.length > 0) {
+    const assignmentsByGroup = new Map<number, CanvasAssignment[]>();
+    for (const assignment of gradable) {
+      if (assignment.assignment_group_id == null) continue;
+      assignmentsByGroup.set(assignment.assignment_group_id, [
+        ...(assignmentsByGroup.get(assignment.assignment_group_id) ?? []),
+        assignment,
+      ]);
+    }
+    for (const assignment of gradable) {
+      const groupId = assignment.assignment_group_id;
+      const group = groupId == null ? undefined : groupById.get(groupId);
+      const siblings = groupId == null ? [] : assignmentsByGroup.get(groupId) ?? [];
+      const totalPoints = siblings.reduce((sum, item) => sum + (item.points_possible ?? 0), 0);
+      const share = totalPoints > 0
+        ? (assignment.points_possible ?? 0) / totalPoints
+        : siblings.length > 0 ? 1 / siblings.length : 0;
+      const groupWeight = Math.max(0, group?.group_weight ?? 0);
+      result.set(assignment.id, {
+        weight: Math.round(groupWeight * share * 100) / 100,
+        ...(group?.name ? { groupName: group.name.trim() } : {}),
+        groupWeight,
+      });
+    }
+    return result;
+  }
+
+  const totalPoints = gradable.reduce((sum, assignment) => sum + (assignment.points_possible ?? 0), 0);
+  for (const assignment of gradable) {
+    const group = assignment.assignment_group_id == null
+      ? undefined
+      : groupById.get(assignment.assignment_group_id);
+    result.set(assignment.id, {
+      weight: totalPoints > 0
+        ? Math.round(((assignment.points_possible ?? 0) / totalPoints) * 10_000) / 100
+        : 0,
+      ...(group?.name ? { groupName: group.name.trim() } : {}),
+      ...(group?.group_weight != null ? { groupWeight: Math.max(0, group.group_weight) } : {}),
+    });
+  }
+  return result;
+}
+
 export function normalizeCanvasData(
   profile: CanvasProfile,
   canvasCourses: CanvasCourse[],
   assignmentsByCourse: Map<number, CanvasAssignment[]>,
+  assignmentGroupsByCourse: Map<number, CanvasAssignmentGroup[]> = new Map(),
 ): CanvasSyncPayload {
   const now = new Date();
   const fallbackEnd = new Date(now);
@@ -287,26 +360,36 @@ export function normalizeCanvasData(
   const assessments: Assessment[] = [];
   const grades: Grade[] = [];
   for (const course of canvasCourses) {
-    for (const assignment of assignmentsByCourse.get(course.id) ?? []) {
-      if (!assignment.due_at) continue;
-      const { date, time } = dateAndTime(assignment.due_at);
+    const courseAssignments = assignmentsByCourse.get(course.id) ?? [];
+    const weights = assignmentWeights(
+      course,
+      courseAssignments,
+      assignmentGroupsByCourse.get(course.id) ?? [],
+    );
+    for (const assignment of courseAssignments) {
       const completed = ["submitted", "graded"].includes(assignment.submission?.workflow_state ?? "");
       const taskId = `canvas-task-${assignment.id}`;
       const assessmentId = `canvas-assessment-${assignment.id}`;
-      tasks.push({
-        id: taskId,
-        courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
-        title: assignment.name?.trim() || "Actividad de Canvas",
-        description: stripHtml(assignment.description),
-        dueDate: date,
-        dueTime: time,
-        priority: priorityFor(assignment.due_at),
-        status: completed ? "completed" : "pending",
-        createdAt: new Date().toISOString(),
-        source: "canvas",
-        externalId: String(assignment.id),
-        externalUrl: assignment.html_url ?? null,
-      });
+      if (assignment.due_at) {
+        const { date, time } = dateAndTime(assignment.due_at);
+        tasks.push({
+          id: taskId,
+          courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
+          title: assignment.name?.trim() || "Actividad de Canvas",
+          description: stripHtml(assignment.description),
+          dueDate: date,
+          dueTime: time,
+          priority: priorityFor(assignment.due_at),
+          status: completed ? "completed" : "pending",
+          createdAt: new Date().toISOString(),
+          source: "canvas",
+          externalId: String(assignment.id),
+          externalUrl: assignment.html_url ?? null,
+        });
+      }
+      if (assignment.grading_type === "not_graded") continue;
+      const { date, time } = dateAndTime(assignment.due_at ?? assignment.submission?.graded_at);
+      const weight = weights.get(assignment.id);
       assessments.push({
         id: assessmentId,
         courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
@@ -314,11 +397,14 @@ export function normalizeCanvasData(
         kind: assignmentKind(assignment),
         date,
         time,
-        weight: 0,
+        weight: weight?.weight ?? 0,
         status: assignment.submission?.score != null ? "graded" : "scheduled",
         source: "canvas",
         externalId: String(assignment.id),
         externalUrl: assignment.html_url ?? null,
+        ...(weight?.groupName ? { gradingGroupName: weight.groupName } : {}),
+        ...(weight?.groupWeight != null ? { gradingGroupWeight: weight.groupWeight } : {}),
+        pointsPossible: assignment.points_possible ?? null,
       });
       const score = assignment.submission?.score;
       const possible = assignment.points_possible;

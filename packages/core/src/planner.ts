@@ -35,7 +35,8 @@ export type AssessmentStatus = "upcoming" | "scheduled" | "graded";
 export interface Assessment {
   id: ID; courseId: ID; name: string; kind: AssessmentKind; date: string; time: string | null;
   weight: number; status: AssessmentStatus; source?: "local" | "canvas"; externalId?: string;
-  externalUrl?: string | null;
+  externalUrl?: string | null; gradingGroupName?: string; gradingGroupWeight?: number;
+  pointsPossible?: number | null;
 }
 export interface Grade {
   id: ID; assessmentId: ID; courseId: ID; score: number; note: string;

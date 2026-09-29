@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   normalizeCanvasData,
   type CanvasAssignment,
+  type CanvasAssignmentGroup,
   type CanvasCourse,
   type CanvasProfile,
 } from "@/lib/canvas";
@@ -72,19 +73,27 @@ async function canvasList<T>(path: string, token: string): Promise<T[]> {
   return output;
 }
 
-async function assignmentsForCourses(courses: CanvasCourse[], token: string) {
-  const result = new Map<number, CanvasAssignment[]>();
+async function gradingDataForCourses(courses: CanvasCourse[], token: string) {
+  const assignmentsByCourse = new Map<number, CanvasAssignment[]>();
+  const assignmentGroupsByCourse = new Map<number, CanvasAssignmentGroup[]>();
   for (let start = 0; start < courses.length; start += 5) {
     const batch = courses.slice(start, start + 5);
     await Promise.all(batch.map(async (course) => {
-      const assignments = await canvasList<CanvasAssignment>(
-        `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
-        token,
-      );
-      result.set(course.id, assignments);
+      const [assignments, assignmentGroups] = await Promise.all([
+        canvasList<CanvasAssignment>(
+          `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
+          token,
+        ),
+        canvasList<CanvasAssignmentGroup>(
+          `/api/v1/courses/${course.id}/assignment_groups?per_page=100`,
+          token,
+        ),
+      ]);
+      assignmentsByCourse.set(course.id, assignments);
+      assignmentGroupsByCourse.set(course.id, assignmentGroups);
     }));
   }
-  return result;
+  return { assignmentsByCourse, assignmentGroupsByCourse };
 }
 
 function errorResponse(error: unknown) {
@@ -141,12 +150,17 @@ export async function POST(request: Request) {
     if (courses.length === 0) {
       throw new CanvasApiError("Canvas no devolvió materias activas; no se modificaron tus datos locales.", 422);
     }
-    const assignments = await assignmentsForCourses(courses, token);
+    const { assignmentsByCourse, assignmentGroupsByCourse } = await gradingDataForCourses(courses, token);
 
     if (userId && remember && providedToken) await saveCanvasToken(userId, providedToken);
     else if (userId && !providedToken) await markCanvasTokenSynced(userId);
 
-    return NextResponse.json(normalizeCanvasData(profileResponse.data, courses, assignments));
+    return NextResponse.json(normalizeCanvasData(
+      profileResponse.data,
+      courses,
+      assignmentsByCourse,
+      assignmentGroupsByCourse,
+    ));
   } catch (error) {
     return errorResponse(error);
   }

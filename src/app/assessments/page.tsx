@@ -50,25 +50,29 @@ export default function AssessmentsPage() {
   );
 
   const scored = useMemo(() => {
-    const vals: Array<{ weight: number; score: number }> = [];
+    const byCourse = new Map<string, { weightedScore: number; weight: number }>();
+    let count = 0;
     for (const a of graded) {
       const g = grades.find((x) => x.assessmentId === a.id);
-      if (g) vals.push({ weight: a.weight, score: g.score });
+      if (!g || a.weight <= 0) continue;
+      const current = byCourse.get(a.courseId) ?? { weightedScore: 0, weight: 0 };
+      current.weightedScore += g.score * a.weight;
+      current.weight += a.weight;
+      byCourse.set(a.courseId, current);
+      count += 1;
     }
-    const weighted =
-      vals.reduce((acc, v) => acc + v.score * v.weight, 0) /
-      (vals.reduce((acc, v) => acc + v.weight, 0) || 1);
+    const courseAverages = [...byCourse.values()].map((item) => item.weightedScore / item.weight);
+    const weighted = courseAverages.reduce((sum, value) => sum + value, 0) / (courseAverages.length || 1);
+    const coverage = activeCourses.length > 0
+      ? [...byCourse.values()].reduce((sum, item) => sum + Math.min(100, item.weight), 0) / activeCourses.length
+      : 0;
     return {
-      count: vals.length,
-      weightedPercent: vals.length ? Math.round(weighted * 10) / 10 : null,
-      gradedWeight: vals.reduce((acc, v) => acc + v.weight, 0),
+      count,
+      courseCount: courseAverages.length,
+      weightedPercent: courseAverages.length ? Math.round(weighted * 10) / 10 : null,
+      gradedWeight: Math.round(coverage * 10) / 10,
     };
-  }, [graded, grades]);
-
-  const totalWeight = useMemo(
-    () => graded.reduce((acc, a) => acc + (grades.some((g) => g.assessmentId === a.id) ? a.weight : 0), 0),
-    [graded, grades],
-  );
+  }, [graded, grades, activeCourses.length]);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
@@ -89,7 +93,7 @@ export default function AssessmentsPage() {
               <p className="text-sm font-semibold text-text">Promedio global</p>
               <p className="mt-0.5 text-xs text-text-muted">
                 {scored.count > 0
-                  ? `Según ${scored.count} ${scored.count === 1 ? "nota" : "notas"} · ${totalWeight}% de peso`
+                  ? `${scored.count} ${scored.count === 1 ? "nota" : "notas"} en ${scored.courseCount} ${scored.courseCount === 1 ? "materia" : "materias"} · ${scored.gradedWeight}% cubierto`
                   : "Aún no hay calificaciones"}
               </p>
             </div>
@@ -109,7 +113,7 @@ export default function AssessmentsPage() {
             action={
               upcoming[0] ? (
                 <span className="text-sm font-semibold text-text">
-                  {upcoming[0].weight}%
+                  {Number(upcoming[0].weight.toFixed(2))}%
                 </span>
               ) : null
             }
@@ -176,10 +180,10 @@ export default function AssessmentsPage() {
                     Calificadas
                   </span>
                 }
-                description={`${totalWeight}% del semestre registrado`}
+                description={`${scored.gradedWeight}% promedio del semestre registrado`}
               />
               <div className="mx-4 mt-3">
-                <Progress value={totalWeight} tone="accent" className="h-1.5" />
+                <Progress value={scored.gradedWeight} tone="accent" className="h-1.5" />
               </div>
               <div className="mt-2 mb-1 divide-y divide-border pb-1">
                 {graded.map((a) => (

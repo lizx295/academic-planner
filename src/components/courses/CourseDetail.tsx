@@ -140,6 +140,15 @@ export default function CourseDetailPage() {
     () => (course ? assessmentsForCourse(assessments, course.id) : []),
     [assessments, course],
   );
+  const gradingGroups = useMemo(() => {
+    const groups = new Map<string, { name: string; weight: number }>();
+    for (const assessment of courseAssessments) {
+      if (!assessment.gradingGroupName || assessment.gradingGroupWeight == null) continue;
+      const key = `${assessment.gradingGroupName}:${assessment.gradingGroupWeight}`;
+      groups.set(key, { name: assessment.gradingGroupName, weight: assessment.gradingGroupWeight });
+    }
+    return [...groups.values()].sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name));
+  }, [courseAssessments]);
   const gradedInfo = useMemo(
     () => (course ? weightedGrade(assessments, grades, course.id) : null),
     [assessments, grades, course],
@@ -558,6 +567,27 @@ export default function CourseDetailPage() {
                   : "Calificaciones completas para el semestre."}
               </p>
             </Card>
+            {gradingGroups.length > 0 ? (
+              <Card className="p-4">
+                <CardHeader
+                  title="Ponderaciones de Canvas"
+                  description="Categorías configuradas por el docente para calcular la nota final."
+                />
+                <div className="mt-4 space-y-3">
+                  {gradingGroups.map((group) => (
+                    <div key={`${group.name}-${group.weight}`}>
+                      <div className="mb-1.5 flex items-center justify-between gap-3 text-[13px]">
+                        <span className="min-w-0 truncate font-medium text-text">{group.name}</span>
+                        <span className="shrink-0 tabular-nums text-text-muted">
+                          {Number(group.weight.toFixed(2))}%
+                        </span>
+                      </div>
+                      <Progress value={group.weight} tone="accent" className="h-1.5" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ) : null}
             <Card className="divide-y divide-border">
               {gradedDown.length === 0 ? (
                 <EmptyState

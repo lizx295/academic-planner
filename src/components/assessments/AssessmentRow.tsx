@@ -72,8 +72,17 @@ export function AssessmentRow({
           </span>
           <span className="flex items-center gap-1">
             <Gauge size={13} className="text-text-faint" aria-hidden="true" />
-            Peso {assessment.weight}%
+            Peso {formatWeight(assessment.weight)}%
           </span>
+          {assessment.gradingGroupName ? (
+            <span
+              className="truncate"
+              title={`Grupo ${assessment.gradingGroupName}${assessment.gradingGroupWeight != null ? `: ${assessment.gradingGroupWeight}%` : ""}`}
+            >
+              {assessment.gradingGroupName}
+              {assessment.gradingGroupWeight != null ? ` · grupo ${formatWeight(assessment.gradingGroupWeight)}%` : ""}
+            </span>
+          ) : null}
           <Badge tone={STATUS_TONE[assessment.status]}>{STATUS_LABEL[assessment.status]}</Badge>
         </div>
       </div>
@@ -137,4 +146,8 @@ export function AssessmentRow({
 function formatScore(score?: number | null): string {
   if (score === undefined || score === null) return "–";
   return `${Number(score.toFixed(1))}`;
+}
+
+function formatWeight(weight: number): string {
+  return String(Number(weight.toFixed(2)));
 }

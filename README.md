@@ -199,6 +199,14 @@ planificador. En la primera sincronizacion reemplaza los datos demo; en las
 siguientes actualiza solo los elementos cuyo origen es Canvas y conserva lo
 creado manualmente.
 
+La sincronización consulta también los grupos de tareas de cada curso. Cuando
+Canvas usa ponderaciones por categoría, combina `group_weight`, los puntos
+posibles del grupo y los puntos de cada actividad para obtener su peso efectivo.
+En cursos sin categorías ponderadas, el peso se calcula sobre el total de puntos
+posibles. La pestaña **Calificaciones** muestra además las categorías originales
+configuradas por el docente. Si una categoría usa reglas dinámicas para descartar
+la nota más alta o más baja, se muestra el peso base anterior a ese descarte.
+
 Cuando Canvas publica componentes teórico y práctico por separado, el
 normalizador los agrupa por periodo y código académico. La interfaz muestra una
 sola materia con bloques independientes de **Teoría** y **Práctica**, pero
