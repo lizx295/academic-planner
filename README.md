@@ -14,11 +14,11 @@ la aplicacion web desplegable en Vercel y una aplicacion movil Expo/React Native
   combinacion de datos. Web y movil consumen el mismo paquete para evitar que
   las reglas de negocio diverjan.
 - **Estado local:** Zustand con `localStorage`, disponible aun sin conexion.
-- **Nube:** Supabase Auth anonimo + PostgreSQL con RLS. Cada usuario solo puede
-  leer y modificar su propia fila en `planner_states`.
+- **Nube:** Supabase Auth por correo, contraseña o enlace mágico + PostgreSQL
+  con RLS. Cada usuario solo puede leer y modificar sus propios datos.
 - **Canvas LMS:** el servidor usa `Authorization: Bearer`; el token nunca se
-  expone al navegador ni se guarda en Supabase. Una clave independiente
-  protege el endpoint de sincronizacion del despliegue publico.
+  devuelve al navegador. Si el usuario decide recordarlo, se cifra con
+  AES-256-GCM antes de guardarse en Supabase.
 
 El backend FastAPI de `backend/` se conserva como referencia historica, pero ya
 no es necesario para el despliegue principal en Vercel.
@@ -55,12 +55,46 @@ Sin variables de Supabase la aplicacion sigue funcionando solo con
 `localStorage`. El usuario puede sincronizar una vez con su token personal; el
 guardado cifrado para futuras sincronizaciones requiere configurar Supabase.
 
+### API local para web, Expo Web y emuladores
+
+La API Canvas vive en el mismo servidor Next.js. Al ejecutar `npm run dev`
+queda disponible en `http://localhost:3000`; confirma su estado con:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+`GET /api/health` no expone secretos y responde si Supabase está configurado y
+qué URL Canvas usa el servidor. Para consumir la API desde la app móvil crea
+`apps/mobile/.env.local` con la dirección adecuada:
+
+```dotenv
+# Expo Web o simulador iOS
+EXPO_PUBLIC_WEB_API_URL=http://localhost:3000
+# Emulador Android (alternativa)
+# EXPO_PUBLIC_WEB_API_URL=http://10.0.2.2:3000
+# Teléfono físico (alternativa; usa la IP LAN de tu equipo)
+# EXPO_PUBLIC_WEB_API_URL=http://192.168.1.20:3000
+```
+
+Expo Web usa CORS. En `.env.local` de Next puedes ampliar los orígenes locales
+permitidos, separados por comas:
+
+```dotenv
+LOCAL_API_ALLOWED_ORIGINS=http://localhost:8081,http://127.0.0.1:8081
+```
+
+El token Canvas también puede usarse localmente sin base de datos: se envía al
+Route Handler para esa sincronización y no se conserva. Solo una cuenta
+Supabase autenticada puede activar el guardado cifrado del token.
+
 ## Configurar y sincronizar Supabase
 
-La aplicación usa una sesión anónima de Supabase Auth y guarda el estado del
-planificador en una fila de `public.planner_states`. La migración habilita RLS,
-por lo que cada sesión solo puede acceder a la fila cuyo `user_id` coincide con
-`auth.uid()`.
+La aplicación permite iniciar sesión con correo y contraseña, recibir un enlace
+mágico o continuar en modo local sin nube. Las cuentas Supabase comparten el
+mismo `user_id` en web y móvil y guardan el planificador en
+`public.planner_states`. RLS garantiza que cada cuenta solo pueda acceder a sus
+propios datos, preferencias, dispositivos y token Canvas cifrado.
 
 ### 1. Crear el proyecto
 
@@ -71,15 +105,19 @@ por lo que cada sesión solo puede acceder a la fila cuyo `user_id` coincide con
 3. Espera a que el proyecto termine de aprovisionarse. La contraseña de la base
    no se utiliza en esta aplicación y no debe agregarse al repositorio.
 
-### 2. Habilitar usuarios anónimos
+### 2. Configurar autenticación por correo
 
 1. Abre el proyecto y entra a **Authentication**.
-2. Busca la configuración de proveedores o de inicio de sesión.
-3. Activa **Allow anonymous sign-ins** y guarda los cambios.
-
-Los usuarios anónimos reciben el rol PostgreSQL `authenticated`, que es el rol
-usado por las políticas de la migración. No es lo mismo que la API key pública
-`anon` o `publishable`.
+2. En **Providers > Email**, habilita correo y contraseña. Puedes mantener
+   activada la confirmación de correo para producción.
+3. En **URL Configuration**, define `http://localhost:3000` como Site URL para
+   desarrollo y agrega como Redirect URLs:
+   - `http://localhost:3000/**`
+   - `https://TU-PROYECTO.vercel.app/**`
+   - `academic-planner://**`
+4. Los enlaces mágicos usan las mismas URL. No necesitas habilitar usuarios
+   anónimos: el modo local de la aplicación funciona sin crear una identidad en
+   Supabase.
 
 ### 3. Crear la tabla y las políticas RLS
 
@@ -88,7 +126,8 @@ Opción recomendada desde el dashboard:
 1. Abre **SQL Editor > New query**.
 2. Ejecuta, en orden, el contenido de
    `supabase/migrations/202609280001_planner_states.sql` y
-   `supabase/migrations/202609290001_canvas_integrations.sql`.
+   `supabase/migrations/202609290001_canvas_integrations.sql` y
+   `supabase/migrations/202609290003_accounts_notifications.sql`.
 3. Comprueba en **Table Editor** que existan `planner_states` y
    `canvas_integrations`.
 
@@ -157,24 +196,25 @@ para proyectos nuevos se recomienda una Secret key independiente.
    npm run dev
    ```
 
-3. Abre `http://localhost:3000/settings`.
-4. En **Canvas ESPOL y nube**, el estado debe cambiar de **Solo local** a
-   **Sincronizado**.
+3. Abre `http://localhost:3000`, crea una cuenta o inicia sesión. Para una
+   prueba sin Supabase también puedes elegir **Usar solo en este dispositivo**.
+4. Abre `/settings`; el estado debe cambiar de **Solo local** a
+   **Sincronizado** cuando la sesión use Supabase.
 5. Modifica un dato, espera aproximadamente un segundo y revisa:
-   - **Authentication > Users**: debe existir un usuario anónimo.
+   - **Authentication > Users**: debe existir el usuario con su correo.
    - **Table Editor > planner_states**: debe existir una fila con el mismo UUID
      en `user_id`, un objeto JSON en `state` y un `updated_at` reciente.
+   - **Table Editor > profiles** y `notification_preferences`: debe existir una
+     fila creada automáticamente para la cuenta.
 
 Si el navegador se queda sin conexión, Zustand continúa guardando localmente.
 Si la conexión se perdió después de iniciar la app, un cambio posterior vuelve a
 intentar el respaldo. Si el estado queda en **Error**, recarga la página cuando
 regrese la conexión.
 
-> **Limitación actual:** una cuenta anónima permanece ligada a la sesión del
-> navegador. Si se cierra la sesión, se borran sus datos o se abre la app en otro
-> dispositivo, no existe todavía un correo o contraseña para recuperar ese mismo
-> UUID. Para sincronización real entre dispositivos habría que añadir acceso por
-> correo, OAuth o enlazar la identidad anónima a una cuenta permanente.
+El modo local no sube información y funciona aunque Supabase no esté
+configurado. Para compartir el mismo estado entre web y móvil, inicia sesión con
+el mismo correo en ambos clientes.
 
 ## Configurar Canvas ESPOL
 
@@ -192,12 +232,17 @@ Cada usuario introduce su propio token; no existe un token global compartido.
 El token viaja por HTTPS al Route Handler, nunca se guarda en `localStorage` y
 nunca vuelve a enviarse al navegador después de almacenarlo.
 
-La ruta `POST /api/canvas/sync` obtiene el perfil, los cursos activos y sus
-actividades. Sigue el encabezado `Link` de Canvas para paginacion, trae las
-entregas del estudiante y transforma las notas a la escala 0-100 usada por el
-planificador. En la primera sincronizacion reemplaza los datos demo; en las
-siguientes actualiza solo los elementos cuyo origen es Canvas y conserva lo
-creado manualmente.
+La ruta `POST /api/canvas/sync` obtiene el perfil, cursos activos, actividades,
+entregas del estudiante, comentarios del docente, módulos, archivos, anuncios y
+conversaciones. Consulta cuestionarios clásicos y New Quizzes cuando Canvas los
+expone y sigue el encabezado `Link` para paginación. En la primera sincronización
+reemplaza los datos demo; en las siguientes actualiza solo los elementos cuyo
+origen es Canvas y conserva lo creado manualmente.
+
+Todo contenido Canvas se presenta en modo **solo lectura**. Academic Planner no
+ofrece acciones para cambiar notas, instrucciones, fechas, entregas o materiales
+del docente. Los enlaces “Abrir en Aula Virtual” llevan al flujo oficial de
+Canvas cuando el estudiante necesita responder o entregar una actividad.
 
 La sincronización consulta también los grupos de tareas de cada curso. Cuando
 Canvas usa ponderaciones por categoría, combina `group_weight`, los puntos
@@ -249,7 +294,7 @@ los metadatos de ambas secciones.
 
 ### 3. Configurar las variables de entorno
 
-Antes del primer despliegue, agrega estas cinco variables en la sección
+Antes del primer despliegue, agrega estas variables en la sección
 **Environment Variables** de la pantalla de importación. Si el proyecto ya fue
 creado, están en **Project > Settings > Environment Variables**.
 
@@ -257,6 +302,7 @@ creado, están en **Project > Settings > Environment Variables**.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL de Supabase | Pública, incluida en el build |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key de Supabase | Pública; RLS limita el acceso |
+| `NEXT_PUBLIC_APP_URL` | URL final, por ejemplo `https://app.example.com` | Pública; enlaces y redirecciones |
 | `SUPABASE_SECRET_KEY` | Clave secreta `sb_secret_...` del proyecto | Privada, solo servidor |
 | `CANVAS_BASE_URL` | `https://aulavirtual.espol.edu.ec` | Privada del servidor |
 | `CANVAS_TOKEN_ENCRYPTION_KEY` | Clave aleatoria base64 de 32 bytes | Privada, solo servidor |
@@ -292,7 +338,7 @@ Recomendaciones al guardar las variables:
 5. La interfaz debe informar cuántas materias, tareas y notas fueron
    actualizadas.
 6. Regresa al dashboard de Supabase y comprueba que:
-   - apareció un usuario en **Authentication > Users**;
+   - apareció la cuenta en **Authentication > Users**;
    - `planner_states.updated_at` cambió;
    - existe una fila por usuario en `canvas_integrations`, sin token en texto plano;
    - el JSON `state` contiene cursos cuyo `source` es `canvas`.
@@ -320,16 +366,16 @@ actualizas valores en el dashboard.
 | Síntoma | Revisión recomendada |
 | --- | --- |
 | **Solo local** en Configuración | Faltan las variables públicas de Supabase en el build; agrégalas y redespliega. |
-| `Anonymous sign-ins are disabled` | Habilita **Allow anonymous sign-ins** en Supabase Auth. |
-| Error de tabla o permisos | Ejecuta la migración y confirma que RLS y las cuatro políticas estén activas. |
+| El enlace mágico vuelve al dominio equivocado | Revisa **Authentication > URL Configuration** y agrega la URL exacta de Vercel. |
+| Error de tabla o permisos | Ejecuta las tres migraciones en orden y confirma que RLS esté activo. |
 | HTTP 401 al sincronizar | Canvas rechazó el token personal o la sesión Supabase expiró. Genera otro token e inténtalo de nuevo. |
 | No guarda el token | Ejecuta la segunda migración y configura `SUPABASE_SECRET_KEY` y `CANVAS_TOKEN_ENCRYPTION_KEY`. |
 | Token guardado no se puede descifrar | Restaura la clave de cifrado original o elimina la integración y registra un token nuevo. |
 | Canvas no devuelve materias | Confirma que existan cursos activos para la cuenta y que el token pertenezca al estudiante correcto. |
 | Funciona localmente pero no en producción | Comprueba que las variables estén asignadas al entorno **Production**, no solo a Development o Preview. |
 
-Referencias oficiales: [usuarios anónimos de
-Supabase](https://supabase.com/docs/guides/auth/auth-anonymous), [claves de API
+Referencias oficiales: [autenticación por contraseña de
+Supabase](https://supabase.com/docs/guides/auth/passwords), [claves de API
 de Supabase](https://supabase.com/docs/guides/getting-started/api-keys),
 [variables de entorno de Vercel](https://vercel.com/docs/environment-variables)
 y [despliegues Git en Vercel](https://vercel.com/docs/git).
@@ -421,12 +467,37 @@ no son secretos. Solo deben contener la URL y la clave publicable de Supabase,
 ademas de la URL publica de Vercel. La clave de cifrado y `SUPABASE_SECRET_KEY`
 permanecen exclusivamente en Vercel.
 
-> **Identidad entre dispositivos:** web y movil usan actualmente sesiones
-> anonimas independientes. Aunque apunten a la misma base, cada instalacion
-> obtiene su propio `user_id` y su propia fila. Para que una misma persona vea
-> exactamente el mismo estado en ambos clientes, el siguiente paso es habilitar
-> acceso recuperable por correo u OAuth en Supabase y usar esa misma cuenta en
-> web y movil. La estructura compartida ya esta preparada para ese cambio.
+> **Identidad entre dispositivos:** inicia sesión con la misma cuenta Supabase
+> en web y móvil para reutilizar el mismo `user_id`, estado académico y token
+> Canvas cifrado. El modo local mantiene una identidad independiente por
+> dispositivo y nunca sube los datos.
+
+### Notificaciones
+
+La web incluye un centro de notificaciones, bandeja de anuncios/mensajes Canvas,
+preferencias por categoría, horas de silencio y avisos del navegador mediante
+Service Worker. El móvil usa `expo-notifications` y programa recordatorios
+locales de entregas con 24 y 2 horas de anticipación, incluso si la interfaz no
+está abierta.
+
+La migración `202609290003_accounts_notifications.sql` deja preparadas las
+tablas `notification_devices`, `notification_events` y
+`notification_deliveries` para añadir envío remoto desde un proceso servidor
+sin cambiar el modelo de datos. Para probar los avisos móviles se necesita una
+compilación de desarrollo o EAS; Expo Go puede limitar notificaciones remotas
+según la versión del SDK. Las notificaciones locales sí usan los permisos del
+dispositivo.
+
+En web, el permiso solo puede solicitarse desde un origen seguro (`https`) o
+`localhost`. Si el usuario lo bloquea, debe rehabilitarlo desde los permisos del
+sitio del navegador.
+
+### Recuperación de errores
+
+Next.js incluye límites de error globales y por ruta, además de una página 404.
+Expo incluye su propio `ErrorBoundary`. Ambas interfaces ofrecen reintentar sin
+borrar el estado local. Los errores de Canvas devuelven mensajes explícitos para
+token inválido, configuración incompleta o indisponibilidad del servicio.
 
 ### Compilar Android e iOS con EAS
 
