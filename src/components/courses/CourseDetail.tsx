@@ -46,6 +46,7 @@ import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { AssessmentFormDialog } from "@/components/assessments/AssessmentFormDialog";
+import { ActivityDetailsDialog, type AcademicActivity } from "@/components/activities/ActivityDetails";
 import { AttendanceRow } from "@/components/attendance/AttendanceRow";
 import { AttendanceCorrectionDialog } from "@/components/attendance/AttendanceCorrectionDialog";
 import { MaterialFormDialog } from "@/components/materials/MaterialFormDialog";
@@ -113,6 +114,7 @@ export default function CourseDetailPage() {
     open: boolean;
     assessment: Assessment | null;
   }>({ open: false, assessment: null });
+  const [detailsFor, setDetailsFor] = useState<AcademicActivity | null>(null);
   const [correcting, setCorrecting] = useState<AttendanceRecord | null>(null);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -483,6 +485,7 @@ export default function CourseDetailPage() {
                     key={t.id}
                     task={t}
                     course={course}
+                    onOpen={() => setDetailsFor(t)}
                     canEdit={t.source !== "canvas"}
                     onEdit={t.source === "canvas" ? undefined : () => setTaskForm({ open: true, task: t })}
                     onDelete={t.source === "canvas" ? undefined : () => deleteTask(t.id)}
@@ -523,6 +526,7 @@ export default function CourseDetailPage() {
                     assessment={a}
                     courseColor={course.color}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
+                    onOpen={() => setDetailsFor(a)}
                     onEdit={a.source === "canvas" ? undefined : () => setAssessmentForm({ open: true, assessment: a })}
                     onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
@@ -612,9 +616,11 @@ export default function CourseDetailPage() {
                   const g = grades.find((x) => x.assessmentId === a.id);
                   const score = g?.score ?? 0;
                   return (
-                    <div
+                    <button
                       key={a.id}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-subtle"
+                      onClick={() => setDetailsFor(a)}
                     >
                       <progress
                         value={score}
@@ -633,7 +639,7 @@ export default function CourseDetailPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold tabular-nums text-text">{score}</span>
-                    </div>
+                    </button>
                   );
                 })
               )}
@@ -719,6 +725,11 @@ export default function CourseDetailPage() {
         courses={courses}
         assessment={assessmentForm.assessment}
         defaultCourseId={course.id}
+      />
+      <ActivityDetailsDialog
+        activity={detailsFor}
+        courseName={course.name}
+        onClose={() => setDetailsFor(null)}
       />
       <AttendanceCorrectionDialog
         record={correcting}

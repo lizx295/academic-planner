@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarX2, Clock } from "lucide-react";
 
 import { Dialog } from "@/components/ui/Dialog";
+import { EventDialog } from "@/components/calendar/EventDialog";
 import { useSemesterData } from "@/hooks/useSemesterData";
 import { materializeEvents } from "@/lib/calendar";
 import { courseClassroom } from "@/lib/selectors";
@@ -29,6 +30,7 @@ function timeLabel(event: CalendarEvent): string {
 }
 
 export function DayPreview({ dayKey, onClose }: DayPreviewProps) {
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const {
     activeCourses,
     activeSchedules,
@@ -55,6 +57,19 @@ export function DayPreview({ dayKey, onClose }: DayPreviewProps) {
   });
   const title = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
+  if (selectedEvent) {
+    const courseName = selectedEvent.courseId
+      ? activeCourses.find((course) => course.id === selectedEvent.courseId)?.name
+      : undefined;
+    return (
+      <EventDialog
+        event={selectedEvent}
+        courseName={courseName}
+        onClose={() => setSelectedEvent(null)}
+      />
+    );
+  }
+
   return (
     <Dialog
       open
@@ -79,24 +94,27 @@ export function DayPreview({ dayKey, onClose }: DayPreviewProps) {
               subtitle = room ? `${event.start} – ${event.end} · ${room.name}` : `${event.start} – ${event.end}`;
             }
             return (
-              <li
-                key={event.id}
-                className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-subtle"
-              >
-                <span aria-hidden="true" className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", meta.dotColor)} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-medium text-text">{event.title}</p>
-                    <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", meta.softColor, meta.textColor)}>
-                      {kindLabel(event)}
+              <li key={event.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvent(event)}
+                  className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-subtle"
+                >
+                  <span aria-hidden="true" className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", meta.dotColor)} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-text">{event.title}</span>
+                      <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", meta.softColor, meta.textColor)}>
+                        {kindLabel(event)}
+                      </span>
                     </span>
-                  </div>
-                  {subtitle ? <p className="mt-0.5 truncate text-[13px] text-text-muted">{subtitle}</p> : null}
-                </div>
-                <span className="flex shrink-0 items-center gap-1.5 text-[13px] tabular text-text-faint">
-                  <Clock size={13} aria-hidden="true" />
-                  {timeLabel(event)}
-                </span>
+                    {subtitle ? <span className="mt-0.5 block truncate text-[13px] text-text-muted">{subtitle}</span> : null}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-[13px] tabular text-text-faint">
+                    <Clock size={13} aria-hidden="true" />
+                    {timeLabel(event)}
+                  </span>
+                </button>
               </li>
             );
           })}

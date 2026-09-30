@@ -6,6 +6,7 @@ import { BookOpen, Clock, MonitorSmartphone, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
 import { EVENT_META } from "@/lib/colors";
 import { fmtDayShort, fmtMonthYear } from "@/lib/format";
 import { useAppStore } from "@/store/app";
@@ -21,7 +22,23 @@ export function EventDialog({
   onClose: () => void;
 }) {
   const deletePersonalEvent = useAppStore((s) => s.deletePersonalEvent);
+  const tasks = useAppStore((s) => s.tasks);
+  const assessments = useAppStore((s) => s.assessments);
   if (!event) return null;
+
+  const activity =
+    tasks.find((task) => task.id === event.refId) ??
+    assessments.find((assessment) => assessment.id === event.refId) ??
+    assessments.find((assessment) =>
+      Boolean(event.externalId && assessment.source === event.source && assessment.externalId === event.externalId),
+    ) ??
+    tasks.find((task) =>
+      Boolean(event.externalId && task.source === event.source && task.externalId === event.externalId),
+    );
+
+  if (activity) {
+    return <ActivityDetailsDialog activity={activity} courseName={courseName} onClose={onClose} />;
+  }
 
   const meta = EVENT_META[event.kind];
   const date = new Date(`${event.date}T00:00:00`);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, GraduationCap } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
@@ -12,9 +13,12 @@ import { useSemesterData } from "@/hooks/useSemesterData";
 import { attachCourseName } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import { courseColorClasses } from "@/lib/colors";
+import type { Assessment } from "@/types";
+import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
 
 export function UpcomingAssessments() {
   const { activeAssessments, courses } = useSemesterData();
+  const [detailsFor, setDetailsFor] = useState<Assessment | null>(null);
   const today = new Date().toISOString().slice(0, 10);
 
   const upcoming = attachCourseName(activeAssessments, courses)
@@ -52,9 +56,10 @@ export function UpcomingAssessments() {
               const color = courseColorClasses(a.courseColor);
               return (
                 <li key={a.id}>
-                  <Link
-                    href={`/courses/${a.courseId}`}
-                    className="flex items-center gap-3 rounded-[10px] px-2 py-2 transition-colors hover:bg-surface-subtle"
+                  <button
+                    type="button"
+                    onClick={() => setDetailsFor(a)}
+                    className="flex w-full items-center gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-surface-subtle"
                   >
                     <span aria-hidden="true" className={cn("h-8 w-1 rounded-full", color.bar)} />
                     <span className="min-w-0 flex-1">
@@ -69,13 +74,18 @@ export function UpcomingAssessments() {
                         {diff === 0 ? "Hoy" : diff === 1 ? "Mañana" : `en ${diff} d`}
                       </Badge>
                     </span>
-                  </Link>
+                  </button>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+      <ActivityDetailsDialog
+        activity={detailsFor}
+        courseName={detailsFor ? courses.find((course) => course.id === detailsFor.courseId)?.name : undefined}
+        onClose={() => setDetailsFor(null)}
+      />
     </Card>
   );
 }

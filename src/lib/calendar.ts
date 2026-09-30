@@ -138,6 +138,9 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
       color: "task",
       courseId: task.courseId ?? undefined,
       refId: task.id,
+      source: task.source,
+      externalId: task.externalId,
+      externalUrl: task.externalUrl,
     });
   }
 
@@ -157,6 +160,9 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
       color: EVENT_COLOR[ASSESSMENT_KIND[a.kind]] ?? "task",
       courseId: course.id,
       refId: a.id,
+      source: a.source,
+      externalId: a.externalId,
+      externalUrl: a.externalUrl,
     });
   }
 

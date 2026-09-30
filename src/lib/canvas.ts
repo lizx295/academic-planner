@@ -53,12 +53,32 @@ export interface CanvasAssignment {
   name?: string;
   description?: string | null;
   due_at?: string | null;
+  unlock_at?: string | null;
+  lock_at?: string | null;
   html_url?: string;
   points_possible?: number | null;
   assignment_group_id?: number;
   grading_type?: string;
   submission_types?: string[];
+  allowed_attempts?: number | null;
+  quiz_id?: number | null;
+  locked_for_user?: boolean;
+  lock_explanation?: string | null;
   submission?: CanvasSubmission | null;
+}
+
+export interface CanvasQuiz {
+  id: number;
+  title?: string;
+  description?: string | null;
+  due_at?: string | null;
+  unlock_at?: string | null;
+  lock_at?: string | null;
+  html_url?: string;
+  points_possible?: number | null;
+  question_count?: number | null;
+  time_limit?: number | null;
+  allowed_attempts?: number | null;
 }
 
 export interface CanvasAssignmentGroup {
@@ -99,17 +119,59 @@ function dateAndTime(value: string | null | undefined): { date: string; time: st
   };
 }
 
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: '"',
+  };
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, key: string) => {
+    const numeric = key.startsWith("#x")
+      ? Number.parseInt(key.slice(2), 16)
+      : key.startsWith("#") ? Number.parseInt(key.slice(1), 10) : null;
+    if (numeric != null) return numeric <= 0x10ffff ? String.fromCodePoint(numeric) : entity;
+    return named[key.toLowerCase()] ?? entity;
+  });
+}
+
+function htmlAttribute(attributes: string, name: string): string | null {
+  const match = attributes.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+
 function stripHtml(value: string | null | undefined): string {
-  return (value ?? "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, " ")
+  return decodeHtmlEntities(
+    (value ?? "")
+      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+      .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_match, attributes: string, content: string) => {
+        const href = htmlAttribute(attributes, "href");
+        const label = content.replace(/<[^>]+>/g, " ").trim();
+        if (!href || label.includes(href)) return label;
+        return label ? `${label} (${href})` : href;
+      })
+      .replace(/<iframe\b([^>]*)>[\s\S]*?<\/iframe>/gi, (_match, attributes: string) => {
+        const source = htmlAttribute(attributes, "src");
+        return source ? `\nContenido multimedia: ${source}\n` : "";
+      })
+      .replace(/<img\b([^>]*)>/gi, (_match, attributes: string) => {
+        const source = htmlAttribute(attributes, "src");
+        const alt = htmlAttribute(attributes, "alt");
+        if (!source) return alt ? `[${alt}]` : "";
+        return `\n${alt ? `[Imagen: ${alt}] ` : "Imagen: "}${source}\n`;
+      })
+      .replace(/<li\b[^>]*>/gi, "\n• ")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|section|article|h[1-6]|li|ul|ol|tr|table)>/gi, "\n")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
-    .slice(0, 2000);
+    .slice(0, 50_000);
 }
 
 function cleanCanvasLabel(value: string | null | undefined): string {
@@ -251,6 +313,7 @@ export function normalizeCanvasData(
   canvasCourses: CanvasCourse[],
   assignmentsByCourse: Map<number, CanvasAssignment[]>,
   assignmentGroupsByCourse: Map<number, CanvasAssignmentGroup[]> = new Map(),
+  quizzesByCourse: Map<number, CanvasQuiz[]> = new Map(),
 ): CanvasSyncPayload {
   const now = new Date();
   const fallbackEnd = new Date(now);
@@ -374,12 +437,27 @@ export function normalizeCanvasData(
   const grades: Grade[] = [];
   for (const course of canvasCourses) {
     const courseAssignments = assignmentsByCourse.get(course.id) ?? [];
+    const quizById = new Map((quizzesByCourse.get(course.id) ?? []).map((quiz) => [quiz.id, quiz]));
     const weights = assignmentWeights(
       course,
       courseAssignments,
       assignmentGroupsByCourse.get(course.id) ?? [],
     );
     for (const assignment of courseAssignments) {
+      const quiz = assignment.quiz_id == null ? undefined : quizById.get(assignment.quiz_id);
+      const richDescription = quiz?.description?.trim() ? quiz.description : assignment.description;
+      const details = {
+        description: stripHtml(richDescription),
+        availableFrom: quiz?.unlock_at ?? assignment.unlock_at ?? null,
+        availableUntil: quiz?.lock_at ?? assignment.lock_at ?? null,
+        pointsPossible: quiz?.points_possible ?? assignment.points_possible ?? null,
+        questionCount: quiz?.question_count ?? null,
+        timeLimitMinutes: quiz?.time_limit ?? null,
+        allowedAttempts: quiz?.allowed_attempts ?? assignment.allowed_attempts ?? null,
+        submissionTypes: assignment.submission_types ?? [],
+        lockedForUser: assignment.locked_for_user === true,
+        lockExplanation: assignment.lock_explanation ?? null,
+      };
       const completed = ["submitted", "graded"].includes(assignment.submission?.workflow_state ?? "");
       const taskId = `canvas-task-${assignment.id}`;
       const assessmentId = `canvas-assessment-${assignment.id}`;
@@ -389,7 +467,7 @@ export function normalizeCanvasData(
           id: taskId,
           courseId: courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`,
           title: assignment.name?.trim() || "Actividad de Canvas",
-          description: stripHtml(assignment.description),
+          ...details,
           dueDate: date,
           dueTime: time,
           priority: priorityFor(assignment.due_at),
@@ -415,9 +493,9 @@ export function normalizeCanvasData(
         source: "canvas",
         externalId: String(assignment.id),
         externalUrl: assignment.html_url ?? null,
+        ...details,
         ...(weight?.groupName ? { gradingGroupName: weight.groupName } : {}),
         ...(weight?.groupWeight != null ? { gradingGroupWeight: weight.groupWeight } : {}),
-        pointsPossible: assignment.points_possible ?? null,
       });
       const score = assignment.submission?.score;
       const possible = assignment.points_possible;

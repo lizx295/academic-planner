@@ -25,18 +25,29 @@ export interface AttendanceRecord {
 }
 export type TaskStatus = "pending" | "in_progress" | "completed";
 export type TaskPriority = "low" | "medium" | "high";
-export interface Task {
+export interface AcademicActivityDetails {
+  description?: string;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  pointsPossible?: number | null;
+  questionCount?: number | null;
+  timeLimitMinutes?: number | null;
+  allowedAttempts?: number | null;
+  submissionTypes?: string[];
+  lockedForUser?: boolean;
+  lockExplanation?: string | null;
+}
+export interface Task extends AcademicActivityDetails {
   id: ID; courseId: ID | null; title: string; description: string; dueDate: string;
   dueTime: string | null; priority: TaskPriority; status: TaskStatus; createdAt: string;
   source?: "local" | "canvas"; externalId?: string; externalUrl?: string | null;
 }
 export type AssessmentKind = "exam" | "quiz" | "project" | "presentation" | "assignment" | "lab";
 export type AssessmentStatus = "upcoming" | "scheduled" | "graded";
-export interface Assessment {
+export interface Assessment extends AcademicActivityDetails {
   id: ID; courseId: ID; name: string; kind: AssessmentKind; date: string; time: string | null;
   weight: number; status: AssessmentStatus; source?: "local" | "canvas"; externalId?: string;
   externalUrl?: string | null; gradingGroupName?: string; gradingGroupWeight?: number;
-  pointsPossible?: number | null;
 }
 export interface Grade {
   id: ID; assessmentId: ID; courseId: ID; score: number; note: string;
@@ -67,6 +78,7 @@ export interface PendingAttendance extends AttendanceRecord {
 export interface CalendarEvent {
   id: string; kind: EventKind; title: string; subtitle?: string; date: string; start: string;
   end: string; allDay?: boolean; color: string; courseId?: ID; refId?: ID;
+  source?: "local" | "canvas"; externalId?: string; externalUrl?: string | null;
 }
 export interface CanvasSyncPayload {
   syncedAt: string; profile: Partial<Profile>; activeSemesterId: ID; semesters: Semester[];

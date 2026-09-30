@@ -6,6 +6,7 @@ import {
   type CanvasAssignmentGroup,
   type CanvasCourse,
   type CanvasProfile,
+  type CanvasQuiz,
 } from "@/lib/canvas";
 import {
   authenticatedUserId,
@@ -76,10 +77,11 @@ async function canvasList<T>(path: string, token: string): Promise<T[]> {
 async function gradingDataForCourses(courses: CanvasCourse[], token: string) {
   const assignmentsByCourse = new Map<number, CanvasAssignment[]>();
   const assignmentGroupsByCourse = new Map<number, CanvasAssignmentGroup[]>();
+  const quizzesByCourse = new Map<number, CanvasQuiz[]>();
   for (let start = 0; start < courses.length; start += 5) {
     const batch = courses.slice(start, start + 5);
     await Promise.all(batch.map(async (course) => {
-      const [assignments, assignmentGroups] = await Promise.all([
+      const [assignments, assignmentGroups, quizzes] = await Promise.all([
         canvasList<CanvasAssignment>(
           `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
           token,
@@ -88,12 +90,17 @@ async function gradingDataForCourses(courses: CanvasCourse[], token: string) {
           `/api/v1/courses/${course.id}/assignment_groups?per_page=100`,
           token,
         ),
+        canvasList<CanvasQuiz>(
+          `/api/v1/courses/${course.id}/quizzes?per_page=100`,
+          token,
+        ).catch(() => []),
       ]);
       assignmentsByCourse.set(course.id, assignments);
       assignmentGroupsByCourse.set(course.id, assignmentGroups);
+      quizzesByCourse.set(course.id, quizzes);
     }));
   }
-  return { assignmentsByCourse, assignmentGroupsByCourse };
+  return { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse };
 }
 
 function errorResponse(error: unknown) {
@@ -150,7 +157,7 @@ export async function POST(request: Request) {
     if (courses.length === 0) {
       throw new CanvasApiError("Canvas no devolvió materias activas; no se modificaron tus datos locales.", 422);
     }
-    const { assignmentsByCourse, assignmentGroupsByCourse } = await gradingDataForCourses(courses, token);
+    const { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse } = await gradingDataForCourses(courses, token);
 
     if (userId && remember && providedToken) await saveCanvasToken(userId, providedToken);
     else if (userId && !providedToken) await markCanvasTokenSynced(userId);
@@ -160,6 +167,7 @@ export async function POST(request: Request) {
       courses,
       assignmentsByCourse,
       assignmentGroupsByCourse,
+      quizzesByCourse,
     ));
   } catch (error) {
     return errorResponse(error);

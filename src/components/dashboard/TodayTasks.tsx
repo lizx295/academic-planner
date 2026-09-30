@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, SquareCheck } from "lucide-react";
 import { format } from "date-fns";
@@ -10,6 +11,8 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useSemesterData } from "@/hooks/useSemesterData";
 import { cn } from "@/lib/utils";
+import type { Task } from "@/types";
+import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
 
 const PRIORITY_TONE = {
   high: "danger" as const,
@@ -18,7 +21,9 @@ const PRIORITY_TONE = {
 };
 
 export function TodayTasks() {
-  const { activeTasks } = useSemesterData();
+  const { activeTasks, courses } = useSemesterData();
+  const [detailsFor, setDetailsFor] = useState<Task | null>(null);
+  const courseById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
   const now = new Date();
 
   const relevant = activeTasks
@@ -53,9 +58,10 @@ export function TodayTasks() {
           <ul className="space-y-2">
             {relevant.map((t) => (
               <li key={t.id}>
-                <Link
-                  href="/tasks"
-                  className="group flex items-start gap-3 rounded-[10px] px-2 py-2 transition-colors hover:bg-surface-subtle"
+                <button
+                  type="button"
+                  onClick={() => setDetailsFor(t)}
+                  className="group flex w-full items-start gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-surface-subtle"
                 >
                   <span
                     aria-hidden="true"
@@ -74,12 +80,17 @@ export function TodayTasks() {
                   <Badge tone={PRIORITY_TONE[t.priority]}>
                     {t.priority === "high" ? "Alta" : t.priority === "medium" ? "Media" : "Baja"}
                   </Badge>
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </div>
+      <ActivityDetailsDialog
+        activity={detailsFor}
+        courseName={detailsFor?.courseId ? courseById.get(detailsFor.courseId)?.name : undefined}
+        onClose={() => setDetailsFor(null)}
+      />
     </Card>
   );
 }

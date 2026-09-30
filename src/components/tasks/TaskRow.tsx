@@ -22,11 +22,12 @@ export interface TaskRowProps {
   task: Task;
   course?: Course;
   canEdit?: boolean;
+  onOpen?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }
 
-export function TaskRow({ task, course, canEdit, onEdit, onDelete }: TaskRowProps) {
+export function TaskRow({ task, course, canEdit, onOpen, onEdit, onDelete }: TaskRowProps) {
   const setTaskStatus = useAppStore((s) => s.setTaskStatus);
   const [confirming, setConfirming] = useState(false);
   const canManageContent = Boolean(canEdit) && task.source !== "canvas";
@@ -58,7 +59,13 @@ export function TaskRow({ task, course, canEdit, onEdit, onDelete }: TaskRowProp
         {task.status === "completed" ? <Check size={12} strokeWidth={3} /> : null}
       </button>
 
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        className="min-w-0 flex-1 rounded-lg text-left outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+        aria-label={onOpen ? `Ver detalles de ${task.title}` : undefined}
+      >
         <p
           className={cn(
             "truncate text-sm",
@@ -83,7 +90,7 @@ export function TaskRow({ task, course, canEdit, onEdit, onDelete }: TaskRowProp
           </span>
           {task.dueTime ? <span className="tabular-nums">{task.dueTime}</span> : null}
         </p>
-      </div>
+      </button>
 
       <Badge dot tone={task.priority === "low" ? "neutral" : task.priority === "medium" ? "warning" : "danger"} className={cn(PRIORITY_STYLE[task.priority], "hidden sm:inline-flex")}>
         {task.priority === "high" ? "Alta" : task.priority === "medium" ? "Media" : "Baja"}

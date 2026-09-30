@@ -37,6 +37,7 @@ export interface AssessmentRowProps {
   assessment: Assessment;
   courseColor: CourseColor;
   gradeScore?: number | null;
+  onOpen?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -45,6 +46,7 @@ export function AssessmentRow({
   assessment,
   courseColor,
   gradeScore,
+  onOpen,
   onEdit,
   onDelete,
 }: AssessmentRowProps) {
@@ -56,7 +58,13 @@ export function AssessmentRow({
   return (
     <div className="flex items-center gap-3 px-3 py-3">
       <span className={cn("h-9 w-1 shrink-0 rounded-full", cls.bar)} aria-hidden="true" />
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!onOpen}
+        className="min-w-0 flex-1 rounded-lg text-left outline-none transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+        aria-label={onOpen ? `Ver detalles de ${assessment.name}` : undefined}
+      >
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-medium text-text">{assessment.name}</p>
           <Badge tone={KIND_TONE[assessment.kind]}>
@@ -84,7 +92,7 @@ export function AssessmentRow({
           ) : null}
           <Badge tone={STATUS_TONE[assessment.status]}>{STATUS_LABEL[assessment.status]}</Badge>
         </div>
-      </div>
+      </button>
 
       <div className="flex shrink-0 items-center gap-1">
         {graded ? (
