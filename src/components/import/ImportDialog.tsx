@@ -35,9 +35,11 @@ export function ImportDialog({ open, onClose, courses }: ImportDialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    setFile(null);
-    setResult(null);
-    setDone(false);
+    queueMicrotask(() => {
+      setFile(null);
+      setResult(null);
+      setDone(false);
+    });
   }, [open]);
 
   async function onFileSelected(next: File | null) {
@@ -55,7 +57,7 @@ export function ImportDialog({ open, onClose, courses }: ImportDialogProps) {
           .map((c) => [c.code.toUpperCase(), c]),
       );
       if (source === "ics") {
-        const range = icsRange(new Date());
+        const range = icsRange();
         const parsed = parseICS(text, next.name, range.from, range.to);
         setResult({
           ...parsed,

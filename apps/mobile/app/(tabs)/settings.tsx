@@ -1,21 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { Card, SectionTitle } from "@/components/Card";
+import { enableMobileNotifications } from "@/components/NotificationManager";
 import { Screen } from "@/components/Screen";
 import { StatusPill } from "@/components/StatusPill";
+import { useMobileAuth } from "@/store/auth";
 import { usePlannerStore } from "@/store/planner";
 import { usePlannerTheme } from "@/theme";
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { colors } = usePlannerTheme();
+  const auth = useMobileAuth();
   const snapshot = usePlannerStore((state) => state.snapshot);
   const cloudStatus = usePlannerStore((state) => state.cloudStatus);
   const cloudMessage = usePlannerStore((state) => state.cloudMessage);
   const canvasConnected = usePlannerStore((state) => state.canvasConnected);
   const syncCanvas = usePlannerStore((state) => state.syncCanvas);
   const forgetCanvas = usePlannerStore((state) => state.forgetCanvas);
+  const updateNotificationPreferences = usePlannerStore((state) => state.updateNotificationPreferences);
   const [token, setToken] = useState("");
   const [syncing, setSyncing] = useState(false);
 
@@ -41,6 +47,28 @@ export default function SettingsScreen() {
     }
   }
 
+  async function toggleNotifications(enabled: boolean) {
+    try {
+      if (!enabled) {
+        await updateNotificationPreferences({ mobile: false });
+        return;
+      }
+      if (Platform.OS === "web") {
+        Alert.alert("Disponible en la app nativa", "En Expo Web, activa las notificaciones desde la aplicación web principal.");
+        return;
+      }
+      const granted = await enableMobileNotifications();
+      if (!granted) {
+        Alert.alert("Permiso no concedido", "Puedes habilitarlo después desde los ajustes del dispositivo.");
+        return;
+      }
+      await updateNotificationPreferences({ enabled: true, mobile: true });
+      Alert.alert("Notificaciones activadas", "Se programarán avisos antes de tus próximas entregas.");
+    } catch (error) {
+      Alert.alert("No se pudo actualizar", error instanceof Error ? error.message : "Inténtalo de nuevo.");
+    }
+  }
+
   const cloudLabel = cloudStatus === "synced" ? "Sincronizado" : cloudStatus === "connecting" ? "Conectando" : cloudStatus === "error" ? "Error" : "Solo local";
   return (
     <Screen title="Más" subtitle="Perfil, nube e integraciones.">
@@ -55,6 +83,21 @@ export default function SettingsScreen() {
             <Text style={[styles.university, { color: colors.textFaint }]}>{snapshot.profile.university || "Universidad"}</Text>
           </View>
         </View>
+      </Card>
+
+      <Card>
+        <SectionTitle action={<StatusPill label={auth.status === "authenticated" ? "Con nube" : "Local"} tone={auth.status === "authenticated" ? "success" : "neutral"} />}>Cuenta</SectionTitle>
+        <Text style={[styles.accountName, { color: colors.text }]}>{auth.name || snapshot.profile.name || "Estudiante"}</Text>
+        <Text style={[styles.description, { color: colors.textMuted }]}>{auth.email || "Sin correo configurado"}</Text>
+        <Text style={[styles.hint, { color: colors.textFaint }]}>{auth.status === "authenticated" ? "La sesión está vinculada a Supabase y puede sincronizarse entre dispositivos." : "La sesión y los datos permanecen en este dispositivo."}</Text>
+        <Pressable onPress={() => { void auth.signOut(); }} style={[styles.secondaryButton, { borderColor: colors.borderStrong }]}><Ionicons name="log-out-outline" size={16} color={colors.textMuted} /><Text style={[styles.secondaryText, { color: colors.textMuted }]}>Cerrar sesión</Text></Pressable>
+      </Card>
+
+      <Card>
+        <SectionTitle>Comunicación</SectionTitle>
+        <Pressable onPress={() => router.push("/notifications" as never)} style={[styles.linkRow, { borderBottomColor: colors.border }]}><Ionicons name="notifications-outline" size={19} color={colors.accent} /><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Notificaciones</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>Recordatorios y avisos recientes</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>
+        <Pressable onPress={() => router.push("/inbox" as never)} style={[styles.linkRow, { borderBottomColor: colors.border }]}><Ionicons name="mail-outline" size={19} color={colors.accent} /><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Bandeja Canvas</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>{snapshot.conversations.filter((item) => !item.read).length + snapshot.announcements.filter((item) => !item.read).length} sin leer</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>
+        <View style={styles.toggleRow}><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Avisos en este dispositivo</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>24 y 2 horas antes de cada entrega</Text></View><Switch value={snapshot.notificationPreferences.mobile} onValueChange={(value) => { void toggleNotifications(value); }} trackColor={{ false: colors.borderStrong, true: colors.accentSoft }} thumbColor={snapshot.notificationPreferences.mobile ? colors.accent : colors.textFaint} /></View>
       </Card>
 
       <Card>
@@ -113,6 +156,8 @@ const styles = StyleSheet.create({
   program: { marginTop: 3, fontSize: 12 },
   university: { marginTop: 2, fontSize: 11 },
   description: { marginTop: 7, fontSize: 12, lineHeight: 18 },
+  accountName: { marginTop: 14, fontSize: 15, fontWeight: "700" },
+  hint: { marginTop: 8, fontSize: 11, lineHeight: 16 },
   integrationTitle: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   icon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   cardTitle: { fontSize: 14, fontWeight: "700" },
@@ -121,4 +166,11 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 14, fontWeight: "700" },
   forgetButton: { marginTop: 11, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   forgetText: { fontSize: 12, fontWeight: "600" },
+  secondaryButton: { marginTop: 15, minHeight: 42, borderWidth: 1, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  secondaryText: { fontSize: 13, fontWeight: "700" },
+  linkRow: { minHeight: 62, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: 11 },
+  toggleRow: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 12 },
+  linkCopy: { flex: 1 },
+  linkTitle: { fontSize: 13, fontWeight: "700" },
+  linkMeta: { marginTop: 3, fontSize: 11 },
 });

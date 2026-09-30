@@ -54,14 +54,16 @@ export function AssessmentFormDialog({
     if (!open) return;
     const w = assessment
       ? String(assessment.weight)
-      : String(ASSESSMENT_KIND_DEFAULT_WEIGHT[kind]);
-    setName(assessment?.name ?? "");
-    setKind(assessment?.kind ?? "exam");
-    setCourseId(assessment?.courseId ?? defaultCourseId ?? "");
-    setDate(assessment?.date ?? todayISO());
-    setTime(assessment?.time ?? "10:00");
-    setWeight(w);
-    setErrors({});
+      : String(ASSESSMENT_KIND_DEFAULT_WEIGHT.exam);
+    queueMicrotask(() => {
+      setName(assessment?.name ?? "");
+      setKind(assessment?.kind ?? "exam");
+      setCourseId(assessment?.courseId ?? defaultCourseId ?? "");
+      setDate(assessment?.date ?? todayISO());
+      setTime(assessment?.time ?? "10:00");
+      setWeight(w);
+      setErrors({});
+    });
   }, [open, assessment, defaultCourseId]);
 
   function onKindChange(next: AssessmentKind) {

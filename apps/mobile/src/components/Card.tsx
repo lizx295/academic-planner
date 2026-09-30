@@ -19,7 +19,7 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 18, padding: 16 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 16 },
   sectionTitle: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
   sectionText: { fontSize: 15, fontWeight: "700", letterSpacing: -0.25 },
 });

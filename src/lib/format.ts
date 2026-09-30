@@ -58,7 +58,6 @@ export function fmtRelativeDay(date: Date): string {
 
 /** Distancia relativa corta en español con el sufijo "en X" / "hace X". */
 export function fmtRelativeIn(date: Date): string {
-  const now = new Date();
   return formatDistanceToNowStrict(date, { locale: LOCALE, addSuffix: true });
 }
 

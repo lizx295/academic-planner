@@ -1,4 +1,16 @@
 export type ID = string;
+export const ACADEMIC_TIME_ZONE = "America/Guayaquil";
+
+export function academicDateKey(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: ACADEMIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
 
 export interface Semester {
   id: ID; label: string; startsAt: string; endsAt: string; isActive: boolean;
@@ -36,6 +48,14 @@ export interface AcademicActivityDetails {
   submissionTypes?: string[];
   lockedForUser?: boolean;
   lockExplanation?: string | null;
+  submissionState?: string | null;
+  submittedAt?: string | null;
+  gradedAt?: string | null;
+  attempt?: number | null;
+  late?: boolean;
+  missing?: boolean;
+  feedback?: Array<{ id: string; author: string; comment: string; createdAt: string | null }>;
+  attachments?: Array<{ id: string; name: string; url: string; contentType?: string | null }>;
 }
 export interface Task extends AcademicActivityDetails {
   id: ID; courseId: ID | null; title: string; description: string; dueDate: string;
@@ -54,15 +74,43 @@ export interface Grade {
   source?: "local" | "canvas"; externalId?: string;
 }
 export type NotificationKind =
-  | "class_reminder" | "class_ended" | "attendance_confirm" | "task_due" | "assessment_soon" | "system";
+  | "class_reminder" | "class_ended" | "attendance_confirm" | "task_due" | "assessment_soon"
+  | "announcement" | "message" | "grade_posted" | "module_unlocked" | "due_changed" | "system";
 export interface AppNotification {
   id: ID; kind: NotificationKind; title: string; body: string; createdAt: string; read: boolean; refId: ID | null;
+  href?: string | null; source?: "local" | "canvas"; eventKey?: string;
+}
+export interface NotificationPreferences {
+  enabled: boolean; browser: boolean; mobile: boolean; announcements: boolean; messages: boolean;
+  grades: boolean; deadlines: boolean; classReminders: boolean; leadHours: number[];
+  quietStart: string; quietEnd: string;
 }
 export interface NotionWorkspace {
   id: ID; courseId: ID; title: string; pageUrl: string; integration: "manual" | "api"; lastSyncedAt: string | null;
 }
 export type MaterialKind = "pdf" | "slides" | "link" | "video" | "doc";
-export interface Material { id: ID; courseId: ID; title: string; kind: MaterialKind; url: string }
+export interface Material {
+  id: ID; courseId: ID; title: string; kind: MaterialKind; url: string;
+  source?: "local" | "canvas"; externalId?: string; moduleId?: string | null;
+}
+export type CanvasModuleItemKind = "File" | "Page" | "Discussion" | "Assignment" | "Quiz" | "SubHeader" | "ExternalUrl" | "ExternalTool" | "Other";
+export interface CanvasModuleItem {
+  id: ID; moduleId: ID; courseId: ID; title: string; kind: CanvasModuleItemKind; position: number;
+  completed: boolean; required: boolean; locked: boolean; externalUrl: string | null; externalId: string;
+}
+export interface CanvasModule {
+  id: ID; courseId: ID; name: string; position: number; state: "locked" | "unlocked" | "started" | "completed";
+  unlockAt: string | null; itemsCount: number; requireSequentialProgress: boolean; source: "canvas";
+}
+export interface Announcement {
+  id: ID; courseId: ID; title: string; message: string; postedAt: string; authorName: string;
+  externalUrl: string | null; read: boolean; source: "canvas"; externalId: string;
+}
+export interface InboxConversation {
+  id: ID; subject: string; preview: string; lastMessageAt: string; messageCount: number;
+  read: boolean; starred: boolean; participantNames: string[]; externalUrl: string | null;
+  source: "canvas"; externalId: string;
+}
 export type EventKind = "class" | "task" | "exam" | "project" | "delivery" | "personal";
 export interface PersonalEvent {
   id: ID; title: string; date: string; startTime: string | null; endTime: string | null; allDay: boolean;
@@ -83,15 +131,25 @@ export interface CalendarEvent {
 export interface CanvasSyncPayload {
   syncedAt: string; profile: Partial<Profile>; activeSemesterId: ID; semesters: Semester[];
   professors: Professor[]; courses: Course[]; tasks: Task[]; assessments: Assessment[]; grades: Grade[];
-  counts: { courses: number; tasks: number; grades: number };
+  modules?: CanvasModule[]; moduleItems?: CanvasModuleItem[]; materials?: Material[];
+  announcements?: Announcement[]; conversations?: InboxConversation[];
+  counts: { courses: number; tasks: number; grades: number; announcements?: number; modules?: number };
 }
 export interface PlannerSnapshot {
   initialized: boolean; profile: Profile; activeSemesterId: string; semesters: Semester[];
   professors: Professor[]; classrooms: Classroom[]; courses: Course[]; schedules: CourseSchedule[];
   attendance: AttendanceRecord[]; tasks: Task[]; assessments: Assessment[]; grades: Grade[];
   notifications: AppNotification[]; notionWorkspaces: NotionWorkspace[]; materials: Material[];
-  personalEvents: PersonalEvent[]; theme: ThemePreference;
+  personalEvents: PersonalEvent[]; modules: CanvasModule[]; moduleItems: CanvasModuleItem[];
+  announcements: Announcement[]; conversations: InboxConversation[];
+  notificationPreferences: NotificationPreferences; theme: ThemePreference;
 }
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  enabled: true, browser: false, mobile: false, announcements: true, messages: true,
+  grades: true, deadlines: true, classReminders: true, leadHours: [24, 2],
+  quietStart: "22:00", quietEnd: "07:00",
+};
 
 export function emptyPlannerSnapshot(): PlannerSnapshot {
   return {
@@ -99,7 +157,8 @@ export function emptyPlannerSnapshot(): PlannerSnapshot {
     profile: { name: "", university: "", program: "", studentId: "", avatarColor: "indigo" },
     activeSemesterId: "", semesters: [], professors: [], classrooms: [], courses: [], schedules: [],
     attendance: [], tasks: [], assessments: [], grades: [], notifications: [], notionWorkspaces: [],
-    materials: [], personalEvents: [], theme: "system",
+    materials: [], personalEvents: [], modules: [], moduleItems: [], announcements: [], conversations: [],
+    notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES }, theme: "system",
   };
 }
 
@@ -252,6 +311,11 @@ export function upgradeCanvasCourseSections<T extends PlannerSnapshot>(state: T)
   const activeSemesterId = semesterId(state.activeSemesterId);
   return {
     ...state,
+    modules: state.modules ?? [],
+    moduleItems: state.moduleItems ?? [],
+    announcements: state.announcements ?? [],
+    conversations: state.conversations ?? [],
+    notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES, ...(state.notificationPreferences ?? {}) },
     activeSemesterId,
     semesters: state.semesters.flatMap((semester) => {
       if (semester.source !== "canvas") return [semester];
@@ -279,6 +343,8 @@ export function mergeCanvasSync(state: PlannerSnapshot, payload: CanvasSyncPaylo
   const isDemoState = state.activeSemesterId === "sem-2026-2" && state.courses.length === 6
     && state.courses.every((course) => /^co[1-6]$/.test(course.id));
   const local = <T extends { source?: string }>(items: T[]) => items.filter((item) => item.source !== "canvas");
+  const readAnnouncements = new Set(state.announcements.filter((item) => item.read).map((item) => item.externalId));
+  const readConversations = new Set(state.conversations.filter((item) => item.read).map((item) => item.externalId));
   return upgradeCanvasCourseSections({
     ...state,
     profile: { ...state.profile, ...payload.profile }, activeSemesterId: payload.activeSemesterId,
@@ -295,8 +361,16 @@ export function mergeCanvasSync(state: PlannerSnapshot, payload: CanvasSyncPaylo
     grades: [...(isDemoState ? [] : local(state.grades)), ...payload.grades],
     notifications: isDemoState ? [] : state.notifications,
     notionWorkspaces: isDemoState ? [] : state.notionWorkspaces,
-    materials: isDemoState ? [] : state.materials,
+    materials: [
+      ...(isDemoState ? [] : state.materials.filter((item) => item.source !== "canvas")),
+      ...(payload.materials ?? []),
+    ],
     personalEvents: isDemoState ? [] : state.personalEvents,
+    modules: payload.modules ?? [],
+    moduleItems: payload.moduleItems ?? [],
+    announcements: (payload.announcements ?? []).map((item) => ({ ...item, read: item.read || readAnnouncements.has(item.externalId) })),
+    conversations: (payload.conversations ?? []).map((item) => ({ ...item, read: item.read || readConversations.has(item.externalId) })),
+    notificationPreferences: state.notificationPreferences ?? { ...DEFAULT_NOTIFICATION_PREFERENCES },
     initialized: true,
   });
 }

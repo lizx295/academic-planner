@@ -11,6 +11,11 @@ import type {
   Semester,
   Task,
   TaskPriority,
+  Announcement,
+  CanvasModule as PlannerModule,
+  CanvasModuleItem as PlannerModuleItem,
+  InboxConversation,
+  Material,
 } from "@/types";
 
 const COLORS: CourseColor[] = ["indigo", "sky", "emerald", "amber", "rose", "violet", "slate"];
@@ -39,12 +44,35 @@ export interface CanvasCourse {
   apply_assignment_group_weights?: boolean;
   term?: CanvasTerm;
   teachers?: CanvasTeacher[];
+  enrollments?: Array<{ type?: string; role?: string; computed_current_score?: number | null; computed_final_score?: number | null; computed_current_grade?: string | null; computed_final_grade?: string | null }>;
+}
+
+export interface CanvasAttachment {
+  id: number;
+  display_name?: string;
+  filename?: string;
+  url?: string;
+  "content-type"?: string;
+}
+
+export interface CanvasSubmissionComment {
+  id: number;
+  author_name?: string;
+  comment?: string;
+  created_at?: string | null;
 }
 
 export interface CanvasSubmission {
+  assignment_id?: number;
   workflow_state?: string;
   score?: number | null;
   graded_at?: string | null;
+  submitted_at?: string | null;
+  attempt?: number | null;
+  late?: boolean;
+  missing?: boolean;
+  attachments?: CanvasAttachment[];
+  submission_comments?: CanvasSubmissionComment[];
 }
 
 export interface CanvasAssignment {
@@ -68,8 +96,10 @@ export interface CanvasAssignment {
 }
 
 export interface CanvasQuiz {
-  id: number;
+  id: number | string;
+  assignment_id?: number | string;
   title?: string;
+  instructions?: string | null;
   description?: string | null;
   due_at?: string | null;
   unlock_at?: string | null;
@@ -79,6 +109,65 @@ export interface CanvasQuiz {
   question_count?: number | null;
   time_limit?: number | null;
   allowed_attempts?: number | null;
+  quiz_settings?: { session_time_limit_in_seconds?: number | null } | null;
+}
+
+export interface CanvasModuleItem {
+  id: number;
+  module_id: number;
+  position?: number;
+  title?: string;
+  type?: string;
+  html_url?: string;
+  external_url?: string;
+  content_id?: number;
+  completion_requirement?: { type?: string; completed?: boolean } | null;
+  content_details?: { locked_for_user?: boolean; lock_explanation?: string } | null;
+}
+
+export interface CanvasModule {
+  id: number;
+  name?: string;
+  position?: number;
+  unlock_at?: string | null;
+  require_sequential_progress?: boolean;
+  items_count?: number;
+  state?: "locked" | "unlocked" | "started" | "completed";
+  items?: CanvasModuleItem[];
+}
+
+export interface CanvasAnnouncement {
+  id: number;
+  title?: string;
+  message?: string;
+  posted_at?: string;
+  html_url?: string;
+  read_state?: "read" | "unread";
+  context_code?: string;
+  author?: { display_name?: string };
+}
+
+export interface CanvasConversation {
+  id: number;
+  subject?: string;
+  workflow_state?: "read" | "unread" | "archived";
+  last_message?: string;
+  last_message_at?: string;
+  start_at?: string;
+  message_count?: number;
+  starred?: boolean;
+  participants?: Array<{ name?: string; full_name?: string }>;
+  context_name?: string;
+}
+
+export interface CanvasFile {
+  id: number;
+  display_name?: string;
+  filename?: string;
+  url?: string;
+  "content-type"?: string;
+  hidden_for_user?: boolean;
+  locked_for_user?: boolean;
 }
 
 export interface CanvasAssignmentGroup {
@@ -314,6 +403,11 @@ export function normalizeCanvasData(
   assignmentsByCourse: Map<number, CanvasAssignment[]>,
   assignmentGroupsByCourse: Map<number, CanvasAssignmentGroup[]> = new Map(),
   quizzesByCourse: Map<number, CanvasQuiz[]> = new Map(),
+  newQuizzesByCourse: Map<number, CanvasQuiz[]> = new Map(),
+  modulesByCourse: Map<number, CanvasModule[]> = new Map(),
+  filesByCourse: Map<number, CanvasFile[]> = new Map(),
+  canvasAnnouncements: CanvasAnnouncement[] = [],
+  canvasConversations: CanvasConversation[] = [],
 ): CanvasSyncPayload {
   const now = new Date();
   const fallbackEnd = new Date(now);
@@ -437,26 +531,49 @@ export function normalizeCanvasData(
   const grades: Grade[] = [];
   for (const course of canvasCourses) {
     const courseAssignments = assignmentsByCourse.get(course.id) ?? [];
-    const quizById = new Map((quizzesByCourse.get(course.id) ?? []).map((quiz) => [quiz.id, quiz]));
+    const quizById = new Map((quizzesByCourse.get(course.id) ?? []).map((quiz) => [String(quiz.id), quiz]));
+    const newQuizByAssignmentId = new Map((newQuizzesByCourse.get(course.id) ?? []).map((quiz) => [String(quiz.assignment_id ?? quiz.id), quiz]));
     const weights = assignmentWeights(
       course,
       courseAssignments,
       assignmentGroupsByCourse.get(course.id) ?? [],
     );
     for (const assignment of courseAssignments) {
-      const quiz = assignment.quiz_id == null ? undefined : quizById.get(assignment.quiz_id);
-      const richDescription = quiz?.description?.trim() ? quiz.description : assignment.description;
+      const quiz = (assignment.quiz_id == null ? undefined : quizById.get(String(assignment.quiz_id)))
+        ?? newQuizByAssignmentId.get(String(assignment.id));
+      const quizDescription = quiz?.description?.trim() || quiz?.instructions?.trim();
+      const richDescription = quizDescription || assignment.description;
       const details = {
         description: stripHtml(richDescription),
         availableFrom: quiz?.unlock_at ?? assignment.unlock_at ?? null,
         availableUntil: quiz?.lock_at ?? assignment.lock_at ?? null,
         pointsPossible: quiz?.points_possible ?? assignment.points_possible ?? null,
         questionCount: quiz?.question_count ?? null,
-        timeLimitMinutes: quiz?.time_limit ?? null,
+        timeLimitMinutes: quiz?.time_limit ?? (quiz?.quiz_settings?.session_time_limit_in_seconds != null
+          ? Math.round(quiz.quiz_settings.session_time_limit_in_seconds / 60)
+          : null),
         allowedAttempts: quiz?.allowed_attempts ?? assignment.allowed_attempts ?? null,
         submissionTypes: assignment.submission_types ?? [],
         lockedForUser: assignment.locked_for_user === true,
         lockExplanation: assignment.lock_explanation ?? null,
+        submissionState: assignment.submission?.workflow_state ?? null,
+        submittedAt: assignment.submission?.submitted_at ?? null,
+        gradedAt: assignment.submission?.graded_at ?? null,
+        attempt: assignment.submission?.attempt ?? null,
+        late: assignment.submission?.late === true,
+        missing: assignment.submission?.missing === true,
+        feedback: (assignment.submission?.submission_comments ?? []).map((comment) => ({
+          id: String(comment.id),
+          author: comment.author_name?.trim() || "Docente",
+          comment: stripHtml(comment.comment),
+          createdAt: comment.created_at ?? null,
+        })),
+        attachments: (assignment.submission?.attachments ?? []).flatMap((attachment) => attachment.url ? [{
+          id: String(attachment.id),
+          name: attachment.display_name || attachment.filename || "Archivo adjunto",
+          url: attachment.url,
+          contentType: attachment["content-type"] ?? null,
+        }] : []),
       };
       const completed = ["submitted", "graded"].includes(assignment.submission?.workflow_state ?? "");
       const taskId = `canvas-task-${assignment.id}`;
@@ -513,6 +630,96 @@ export function normalizeCanvasData(
     }
   }
 
+  const modules: PlannerModule[] = [];
+  const moduleItems: PlannerModuleItem[] = [];
+  const materials: Material[] = [];
+  const materialIds = new Set<string>();
+  for (const course of canvasCourses) {
+    const courseId = courseIdByCanvasId.get(course.id) ?? `canvas-course-${course.id}`;
+    for (const courseModule of modulesByCourse.get(course.id) ?? []) {
+      const moduleId = `canvas-module-${courseModule.id}`;
+      modules.push({
+        id: moduleId,
+        courseId,
+        name: cleanCanvasLabel(courseModule.name) || "Módulo",
+        position: courseModule.position ?? 0,
+        state: courseModule.state ?? "unlocked",
+        unlockAt: courseModule.unlock_at ?? null,
+        itemsCount: courseModule.items_count ?? courseModule.items?.length ?? 0,
+        requireSequentialProgress: courseModule.require_sequential_progress === true,
+        source: "canvas",
+      });
+      for (const item of courseModule.items ?? []) {
+        const kind = (["File", "Page", "Discussion", "Assignment", "Quiz", "SubHeader", "ExternalUrl", "ExternalTool"] as const)
+          .find((value) => value === item.type) ?? "Other";
+        const externalUrl = item.html_url ?? item.external_url ?? null;
+        moduleItems.push({
+          id: `canvas-module-item-${item.id}`,
+          moduleId,
+          courseId,
+          title: cleanCanvasLabel(item.title) || "Contenido",
+          kind,
+          position: item.position ?? 0,
+          completed: item.completion_requirement?.completed === true,
+          required: Boolean(item.completion_requirement),
+          locked: item.content_details?.locked_for_user === true,
+          externalUrl,
+          externalId: String(item.id),
+        });
+        if (externalUrl && ["File", "Page", "ExternalUrl", "ExternalTool"].includes(kind)) {
+          const id = `canvas-material-module-${item.id}`;
+          if (!materialIds.has(id)) {
+            materialIds.add(id);
+            materials.push({ id, courseId, title: cleanCanvasLabel(item.title) || "Recurso", kind: kind === "File" ? "doc" : "link", url: externalUrl, source: "canvas", externalId: String(item.id), moduleId });
+          }
+        }
+      }
+    }
+    for (const file of filesByCourse.get(course.id) ?? []) {
+      if (!file.url || file.hidden_for_user || file.locked_for_user) continue;
+      const id = `canvas-material-file-${file.id}`;
+      if (materialIds.has(id)) continue;
+      materialIds.add(id);
+      const contentType = file["content-type"] ?? "";
+      const kind: Material["kind"] = contentType.includes("pdf") ? "pdf"
+        : contentType.includes("presentation") || /\.(ppt|pptx)$/i.test(file.filename ?? "") ? "slides"
+          : contentType.startsWith("video/") ? "video" : "doc";
+      materials.push({ id, courseId, title: file.display_name || file.filename || "Archivo", kind, url: file.url, source: "canvas", externalId: String(file.id), moduleId: null });
+    }
+  }
+
+  const announcements: Announcement[] = canvasAnnouncements.flatMap((item) => {
+    const canvasCourseId = Number(item.context_code?.replace("course_", ""));
+    const courseId = courseIdByCanvasId.get(canvasCourseId);
+    if (!courseId) return [];
+    return [{
+      id: `canvas-announcement-${item.id}`,
+      courseId,
+      title: cleanCanvasLabel(item.title) || "Anuncio",
+      message: stripHtml(item.message),
+      postedAt: item.posted_at ?? new Date().toISOString(),
+      authorName: item.author?.display_name?.trim() || "Docente",
+      externalUrl: item.html_url ?? null,
+      read: item.read_state === "read",
+      source: "canvas",
+      externalId: String(item.id),
+    }];
+  });
+
+  const conversations: InboxConversation[] = canvasConversations.map((item) => ({
+    id: `canvas-conversation-${item.id}`,
+    subject: cleanCanvasLabel(item.subject) || item.context_name || "Conversación",
+    preview: stripHtml(item.last_message),
+    lastMessageAt: item.last_message_at ?? item.start_at ?? new Date().toISOString(),
+    messageCount: item.message_count ?? 1,
+    read: item.workflow_state !== "unread",
+    starred: item.starred === true,
+    participantNames: (item.participants ?? []).map((participant) => participant.name || participant.full_name || "Participante"),
+    externalUrl: null,
+    source: "canvas",
+    externalId: String(item.id),
+  }));
+
   const semesters = [...termMap.values()];
   const activeSemesterId = courses[0]?.semesterId ?? semesters[0]?.id ?? "";
   return {
@@ -532,6 +739,11 @@ export function normalizeCanvasData(
     tasks,
     assessments,
     grades,
-    counts: { courses: courses.length, tasks: tasks.length, grades: grades.length },
+    modules,
+    moduleItems,
+    materials,
+    announcements,
+    conversations,
+    counts: { courses: courses.length, tasks: tasks.length, grades: grades.length, announcements: announcements.length, modules: modules.length },
   };
 }

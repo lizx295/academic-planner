@@ -39,10 +39,12 @@ export function WorkspaceDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTitle(workspace?.title ?? "");
-    setPageUrl(workspace?.pageUrl ?? "");
-    setIntegration(workspace?.integration ?? "manual");
-    setErrors({});
+    queueMicrotask(() => {
+      setTitle(workspace?.title ?? "");
+      setPageUrl(workspace?.pageUrl ?? "");
+      setIntegration(workspace?.integration ?? "manual");
+      setErrors({});
+    });
   }, [open, workspace]);
 
   function submit() {

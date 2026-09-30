@@ -87,39 +87,31 @@ export function CourseFormDialog({ open, onClose, course }: CourseFormDialogProp
   const addProfessor = useAppStore((s) => s.addProfessor);
   const addClassroom = useAppStore((s) => s.addClassroom);
 
-  const allSchedules = useAppStore((s) => s.schedules);
-
   const editing = Boolean(course);
-  // NOTA: ojo con selectores que devuelvan nuevas referencias
-  // (p. ej. `.filter(...)`) en el hook de zustand: React entra en bucle
-  // infinito (#185) porque la tienda parece cambiar siempre.
-  const courseSchedules = useMemo(
-    () => (course ? allSchedules.filter((x) => x.courseId === course.id) : []),
-    [allSchedules, course],
-  );
 
   const [draft, setDraft] = useState<DraftState>(() => initDraft());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
-    setDraft(
-      initDraft(
-        course,
-        course?.id
-          ? useAppStore
-              .getState()
-              .schedules.filter((x) => x.courseId === course.id)
-              .map((s) => ({
-                key: uid("slot"),
-                weekday: String(s.weekday),
-                startTime: s.startTime,
-                endTime: s.endTime,
-              }))
-          : undefined,
-      ),
+    const nextDraft = initDraft(
+      course,
+      course?.id
+        ? useAppStore
+            .getState()
+            .schedules.filter((x) => x.courseId === course.id)
+            .map((s) => ({
+              key: uid("slot"),
+              weekday: String(s.weekday),
+              startTime: s.startTime,
+              endTime: s.endTime,
+            }))
+        : undefined,
     );
-    setErrors({});
+    queueMicrotask(() => {
+      setDraft(nextDraft);
+      setErrors({});
+    });
   }, [open, course]);
 
   const professorOptions = useMemo(

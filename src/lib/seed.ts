@@ -18,7 +18,13 @@ import type {
   Profile,
   Weekday,
   CourseColor,
+  CanvasModule,
+  CanvasModuleItem,
+  Announcement,
+  InboxConversation,
+  NotificationPreferences,
 } from "@/types";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "@academic-planner/core";
 
 /* =====================================================================
    DATOS DE EJEMPLO
@@ -41,8 +47,6 @@ function hashStr(input: string): number {
   }
   return (h >>> 0) / 0xffffffff;
 }
-
-const WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5];
 
 /** Rende hísticas: número de sesiones de una materia entre dos fechas. */
 function sessionsBetween(weekday: Weekday, from: Date, to: Date): Date[] {
@@ -77,6 +81,11 @@ export interface AppData {
   notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
+  modules: CanvasModule[];
+  moduleItems: CanvasModuleItem[];
+  announcements: Announcement[];
+  conversations: InboxConversation[];
+  notificationPreferences: NotificationPreferences;
 }
 
 export function buildSeedData(): AppData {
@@ -267,9 +276,7 @@ export function buildSeedData(): AppData {
     for (const date of sessionsBetween(schedule.weekday, semesterStart, now)) {
       if (date.getTime() > now.getTime()) continue;
       const sameDay = iso(date) === iso(now);
-      const [sh, sm] = schedule.startTime.split(":").map(Number);
       const [eh, em] = schedule.endTime.split(":").map(Number);
-      const startsAt = sh * 60 + sm;
       const endsAt = eh * 60 + em;
       // Clase de hoy que aún no termina -> aún no hay registro.
       if (sameDay && endsAt > nowMinutes) continue;
@@ -482,6 +489,11 @@ export function buildSeedData(): AppData {
     notionWorkspaces,
     materials,
     personalEvents,
+    modules: [],
+    moduleItems: [],
+    announcements: [],
+    conversations: [],
+    notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   };
 }
 
@@ -509,5 +521,10 @@ export function emptyData(): AppData {
     notionWorkspaces: [],
     materials: [],
     personalEvents: [],
+    modules: [],
+    moduleItems: [],
+    announcements: [],
+    conversations: [],
+    notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   };
 }

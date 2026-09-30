@@ -1,23 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { Course, Task } from "@academic-planner/core";
+import { academicDateKey, type Course, type Task } from "@academic-planner/core";
 
 import { usePlannerTheme } from "@/theme";
 
-export function TaskItem({ task, course, onToggle }: { task: Task; course?: Course; onToggle: () => void }) {
+export function TaskItem({ task, course, onToggle, onOpen }: { task: Task; course?: Course; onToggle: () => void; onOpen: () => void }) {
   const { colors } = usePlannerTheme();
   const completed = task.status === "completed";
   const due = new Date(`${task.dueDate}T12:00:00`);
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
-  const key = (date: Date) => date.toISOString().slice(0, 10);
-  const dueLabel = task.dueDate === key(today) ? "Hoy" : task.dueDate === key(tomorrow) ? "Mañana" : due.toLocaleDateString("es-EC", { day: "numeric", month: "short" });
+  const dueLabel = task.dueDate === academicDateKey(today) ? "Hoy" : task.dueDate === academicDateKey(tomorrow) ? "Mañana" : due.toLocaleDateString("es-EC", { day: "numeric", month: "short" });
   return (
-    <Pressable onPress={onToggle} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
-      <View style={[styles.check, { borderColor: completed ? colors.accent : colors.borderStrong, backgroundColor: completed ? colors.accent : "transparent" }]}>
+    <Pressable onPress={onOpen} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}>
+      <Pressable onPress={(event) => { event.stopPropagation(); onToggle(); }} hitSlop={10} accessibilityRole="checkbox" accessibilityState={{ checked: completed }} style={[styles.check, { borderColor: completed ? colors.accent : colors.borderStrong, backgroundColor: completed ? colors.accent : "transparent" }]}>
         {completed ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
-      </View>
+      </Pressable>
       <View style={styles.copy}>
         <Text numberOfLines={1} style={[styles.title, { color: colors.text, textDecorationLine: completed ? "line-through" : "none" }]}>{task.title}</Text>
         <Text numberOfLines={1} style={[styles.meta, { color: colors.textFaint }]}>{course?.code ?? "Personal"} · {dueLabel}{task.dueTime ? `, ${task.dueTime}` : ""}</Text>

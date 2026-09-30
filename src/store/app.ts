@@ -27,6 +27,11 @@ import type {
   TaskStatus,
   ThemePreference,
   Weekday,
+  CanvasModule,
+  CanvasModuleItem,
+  Announcement,
+  InboxConversation,
+  NotificationPreferences,
 } from "@/types";
 
 export interface CourseDraft {
@@ -59,6 +64,11 @@ interface AppStore {
   notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
+  modules: CanvasModule[];
+  moduleItems: CanvasModuleItem[];
+  announcements: Announcement[];
+  conversations: InboxConversation[];
+  notificationPreferences: NotificationPreferences;
   theme: ThemePreference;
 
   // --- preferencias ---
@@ -114,6 +124,10 @@ interface AppStore {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   deleteNotification: (id: string) => void;
+  addNotification: (notification: AppNotification) => void;
+  updateNotificationPreferences: (patch: Partial<NotificationPreferences>) => void;
+  markAnnouncementRead: (id: string) => void;
+  markConversationRead: (id: string) => void;
 
   // --- importación ---
   importCourses: (drafts: CourseDraft[]) => number;
@@ -352,6 +366,16 @@ setTheme: (theme) => set({ theme }),
         })),
       deleteNotification: (id) =>
         set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
+      addNotification: (notification) =>
+        set((s) => s.notifications.some((item) =>
+          item.id === notification.id || (notification.eventKey && item.eventKey === notification.eventKey)
+        ) ? {} : { notifications: [notification, ...s.notifications].slice(0, 250) }),
+      updateNotificationPreferences: (patch) =>
+        set((s) => ({ notificationPreferences: { ...s.notificationPreferences, ...patch } })),
+      markAnnouncementRead: (id) =>
+        set((s) => ({ announcements: s.announcements.map((item) => item.id === id ? { ...item, read: true } : item) })),
+      markConversationRead: (id) =>
+        set((s) => ({ conversations: s.conversations.map((item) => item.id === id ? { ...item, read: true } : item) })),
 
       importCourses: (drafts) => {
         let created = 0;
@@ -387,7 +411,7 @@ setTheme: (theme) => set({ theme }),
     }),
     {
       name: "academic-planner-store",
-      version: 3,
+      version: 4,
       migrate: (persisted) => upgradeCanvasCourseSections(persisted as AppStore),
       partialize: (s) => ({
         initialized: s.initialized,
@@ -406,6 +430,11 @@ setTheme: (theme) => set({ theme }),
         notionWorkspaces: s.notionWorkspaces,
         materials: s.materials,
         personalEvents: s.personalEvents,
+        modules: s.modules,
+        moduleItems: s.moduleItems,
+        announcements: s.announcements,
+        conversations: s.conversations,
+        notificationPreferences: s.notificationPreferences,
         theme: s.theme,
       }),
     },
@@ -447,6 +476,11 @@ export function getPersistedPlannerState() {
     notionWorkspaces: s.notionWorkspaces,
     materials: s.materials,
     personalEvents: s.personalEvents,
+    modules: s.modules,
+    moduleItems: s.moduleItems,
+    announcements: s.announcements,
+    conversations: s.conversations,
+    notificationPreferences: s.notificationPreferences,
     theme: s.theme,
   };
 }

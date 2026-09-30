@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 
+import { useAuth } from "@/components/providers/AuthProvider";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { ensureSeedData, getPersistedPlannerState, useAppStore } from "@/store/app";
 
@@ -23,13 +24,16 @@ export const useCloudSync = create<CloudSyncStore>((set) => ({
 }));
 
 export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuth();
   useEffect(() => {
     ensureSeedData();
     const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
+    if (!supabase || auth.status !== "authenticated" || !auth.user) {
       useCloudSync.getState().setState({
         status: "disabled",
-        message: "Supabase no está configurado; se usa almacenamiento local.",
+        message: auth.status === "local"
+          ? "Sesión local activa; conecta una cuenta para sincronizar entre dispositivos."
+          : "Supabase no está configurado; se usa almacenamiento local.",
       });
       return;
     }
@@ -44,13 +48,8 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
       useCloudSync.getState().setState({ status: "connecting", message: null });
       const sessionResult = await client.auth.getSession();
       if (sessionResult.error) throw sessionResult.error;
-      let user = sessionResult.data.session?.user;
-      if (!user) {
-        const anonymous = await client.auth.signInAnonymously();
-        if (anonymous.error) throw anonymous.error;
-        user = anonymous.data.user ?? undefined;
-      }
-      if (!user) throw new Error("Supabase no devolvió un usuario anónimo.");
+      const user = sessionResult.data.session?.user;
+      if (!user) throw new Error("La sesión de Supabase terminó. Inicia sesión nuevamente.");
 
       const remote = await client
         .from("planner_states")
@@ -109,7 +108,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
       if (saveTimer) clearTimeout(saveTimer);
       unsubscribe?.();
     };
-  }, []);
+  }, [auth.status, auth.user]);
 
   return children;
 }

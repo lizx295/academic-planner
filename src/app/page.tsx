@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
+import { ACADEMIC_TIME_ZONE, academicDateKey } from "@academic-planner/core";
 
 import { Card } from "@/components/ui/Card";
 import { useSemesterData } from "@/hooks/useSemesterData";
@@ -21,8 +22,9 @@ import { DayPreview } from "@/components/dashboard/DayPreview";
 function WeekStrip() {
   const { activeCourses, activeSchedules, semester } = useSemesterData();
   const now = useNow(60_000);
-  const today = now.toISOString().slice(0, 10);
-  const monday = addDays(now, -(now.getDay() === 0 ? 6 : now.getDay() - 1));
+  const today = academicDateKey(now);
+  const academicToday = new Date(`${today}T12:00:00`);
+  const monday = addDays(academicToday, -(academicToday.getDay() === 0 ? 6 : academicToday.getDay() - 1));
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -111,9 +113,9 @@ export default function DashboardPage() {
   const name = profile.name.split(" ")[0] || "";
   // El saludo y la fecha salen del reloj; hasta el primer render del cliente
   // (mount) no los pintamos para no chocar con el HTML del servidor (#418).
-  const hour = mounted ? now.getHours() : -1;
+  const hour = mounted ? Number(new Intl.DateTimeFormat("en-US", { timeZone: ACADEMIC_TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now)) : -1;
   const greeting = hour < 0 ? "" : hour < 12 ? "Buenos días" : hour < 20 ? "Buenas tardes" : "Buenas noches";
-  const dayLabel = mounted ? fmtDay(now) : "";
+  const dayLabel = mounted ? fmtDay(new Date(`${academicDateKey(now)}T12:00:00`)) : "";
 
   return (
     <div className="space-y-5">

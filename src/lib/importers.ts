@@ -363,7 +363,7 @@ export function detectSource(fileName: string): ImportSource {
 }
 
 /** Rango de expansión predeterminado para recurrencias .ics. */
-export function icsRange(now: Date): { from: Date; to: Date } {
+export function icsRange(): { from: Date; to: Date } {
   return { from: startOfToday(), to: addDays(startOfToday(), 120) };
 }
 

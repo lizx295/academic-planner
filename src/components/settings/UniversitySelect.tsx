@@ -71,7 +71,7 @@ export function UniversitySelect({ id, value, onChange }: UniversitySelectProps)
   }, []);
 
   useEffect(() => {
-    setActive(0);
+    queueMicrotask(() => setActive(0));
   }, [value]);
 
   return (

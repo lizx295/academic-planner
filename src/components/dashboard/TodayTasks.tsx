@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, SquareCheck } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { academicDateKey } from "@academic-planner/core";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -27,7 +28,7 @@ export function TodayTasks() {
   const now = new Date();
 
   const relevant = activeTasks
-    .filter((t) => t.status !== "completed" && t.dueDate <= now.toISOString().slice(0, 10))
+    .filter((t) => t.status !== "completed" && t.dueDate <= academicDateKey(now))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 5);
 

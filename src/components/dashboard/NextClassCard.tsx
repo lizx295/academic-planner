@@ -11,7 +11,6 @@ import { fmtCountdown } from "@/lib/format";
 import {
   courseClassroom,
   courseProfessor,
-  courseSchedules,
 } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import { courseColorClasses } from "@/lib/colors";

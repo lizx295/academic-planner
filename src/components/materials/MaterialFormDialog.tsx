@@ -34,11 +34,13 @@ export function MaterialFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTitle("");
-    setKind("pdf");
-    setUrl("");
-    setCourseId(defaultCourseId ?? "");
-    setErrors({});
+    queueMicrotask(() => {
+      setTitle("");
+      setKind("pdf");
+      setUrl("");
+      setCourseId(defaultCourseId ?? "");
+      setErrors({});
+    });
   }, [open, defaultCourseId]);
 
   function submit() {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, GraduationCap } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { es } from "date-fns/locale";
+import { academicDateKey } from "@academic-planner/core";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -19,7 +20,7 @@ import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
 export function UpcomingAssessments() {
   const { activeAssessments, courses } = useSemesterData();
   const [detailsFor, setDetailsFor] = useState<Assessment | null>(null);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = academicDateKey();
 
   const upcoming = attachCourseName(activeAssessments, courses)
     .filter((a) => a.date >= today)

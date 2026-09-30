@@ -220,7 +220,7 @@
 @utility surface-card {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 @utility text-balance {

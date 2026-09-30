@@ -5,6 +5,7 @@ import {
   upgradeCanvasCourseSections,
   type CanvasSyncPayload,
   type PlannerSnapshot,
+  type NotificationPreferences,
 } from "@academic-planner/core";
 
 import { createMobileDemo } from "@/data/demo";
@@ -21,8 +22,13 @@ interface MobilePlannerStore {
   canvasConnected: boolean;
   initialize: () => Promise<void>;
   toggleTask: (id: string) => void;
+  updateProfile: (patch: Partial<PlannerSnapshot["profile"]>) => void;
   syncCanvas: (token?: string) => Promise<CanvasSyncPayload["counts"]>;
   forgetCanvas: () => Promise<void>;
+  updateNotificationPreferences: (patch: Partial<NotificationPreferences>) => Promise<void>;
+  markNotificationRead: (id: string) => void;
+  markAnnouncementRead: (id: string) => void;
+  markConversationRead: (id: string) => void;
 }
 
 function webApiUrl(): string {
@@ -72,13 +78,11 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
       set({ cloudStatus: "connecting", cloudMessage: null });
       const session = await supabase.auth.getSession();
       if (session.error) throw session.error;
-      let user = session.data.session?.user;
+      const user = session.data.session?.user;
       if (!user) {
-        const anonymous = await supabase.auth.signInAnonymously();
-        if (anonymous.error) throw anonymous.error;
-        user = anonymous.data.user ?? undefined;
+        set({ ready: true, cloudStatus: "local", cloudMessage: "Inicia sesión para activar el respaldo entre dispositivos." });
+        return;
       }
-      if (!user) throw new Error("Supabase no devolvió una sesión.");
       const remote = await supabase
         .from("planner_states")
         .select("state")
@@ -131,6 +135,12 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
     );
   },
 
+  updateProfile: (patch) => {
+    const snapshot = { ...get().snapshot, profile: { ...get().snapshot.profile, ...patch } };
+    set({ snapshot });
+    void persistSnapshot(snapshot);
+  },
+
   syncCanvas: async (token) => {
     const auth = await authorizationHeaders();
     const response = await fetch(`${webApiUrl()}/api/canvas/sync`, {
@@ -161,5 +171,41 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
     const body = await response.json() as { error?: string };
     if (!response.ok) throw new Error(body.error || "No se pudo eliminar el token guardado.");
     set({ canvasConnected: false });
+  },
+
+  updateNotificationPreferences: async (patch) => {
+    const snapshot = {
+      ...get().snapshot,
+      notificationPreferences: { ...get().snapshot.notificationPreferences, ...patch },
+    };
+    set({ snapshot });
+    await persistSnapshot(snapshot);
+  },
+
+  markNotificationRead: (id) => {
+    const snapshot = {
+      ...get().snapshot,
+      notifications: get().snapshot.notifications.map((item) => item.id === id ? { ...item, read: true } : item),
+    };
+    set({ snapshot });
+    void persistSnapshot(snapshot);
+  },
+
+  markAnnouncementRead: (id) => {
+    const snapshot = {
+      ...get().snapshot,
+      announcements: get().snapshot.announcements.map((item) => item.id === id ? { ...item, read: true } : item),
+    };
+    set({ snapshot });
+    void persistSnapshot(snapshot);
+  },
+
+  markConversationRead: (id) => {
+    const snapshot = {
+      ...get().snapshot,
+      conversations: get().snapshot.conversations.map((item) => item.id === id ? { ...item, read: true } : item),
+    };
+    set({ snapshot });
+    void persistSnapshot(snapshot);
   },
 }));

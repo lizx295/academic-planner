@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { courseColors } from "@academic-planner/core";
 
 import { Card } from "@/components/Card";
@@ -8,6 +9,7 @@ import { usePlannerStore } from "@/store/planner";
 import { usePlannerTheme } from "@/theme";
 
 export default function CoursesScreen() {
+  const router = useRouter();
   const { colors } = usePlannerTheme();
   const snapshot = usePlannerStore((state) => state.snapshot);
   const professors = new Map(snapshot.professors.map((item) => [item.id, item]));
@@ -19,7 +21,8 @@ export default function CoursesScreen() {
         const pending = snapshot.tasks.filter((task) => task.courseId === course.id && task.status !== "completed").length;
         const accent = courseColors[course.color];
         return (
-          <Card key={course.id} style={styles.courseCard}>
+          <Pressable key={course.id} onPress={() => router.push(`/course/${course.id}` as never)}>
+          <Card style={styles.courseCard}>
             <View style={[styles.bar, { backgroundColor: accent }]} />
             <View style={styles.courseHeader}>
               <View style={{ flex: 1 }}>
@@ -51,6 +54,7 @@ export default function CoursesScreen() {
               {course.source === "canvas" ? <Text style={[styles.source, { color: colors.accent, backgroundColor: colors.accentSoft }]}>CANVAS</Text> : null}
             </View>
           </Card>
+          </Pressable>
         );
       })}
       {snapshot.courses.length === 0 ? <Card><Text style={[styles.empty, { color: colors.textMuted }]}>Sin materias. Sincroniza Canvas desde Más.</Text></Card> : null}

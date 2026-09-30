@@ -10,8 +10,14 @@ import {
   SquareCheck,
   Sun,
   UserCheck,
+  GraduationCap,
+  Megaphone,
+  MessageSquare,
+  Unlock,
+  CalendarSync,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { Logo } from "@/components/layout/Logo";
 import { IconButton } from "@/components/ui/Button";
@@ -30,6 +36,11 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
   task_due: SquareCheck,
   assessment_soon: CalendarClock,
   system: Info,
+  announcement: Megaphone,
+  message: MessageSquare,
+  grade_posted: GraduationCap,
+  module_unlocked: Unlock,
+  due_changed: CalendarSync,
 };
 
 function NotificationBell() {
@@ -37,6 +48,7 @@ function NotificationBell() {
   const markRead = useAppStore((s) => s.markNotificationRead);
   const markAll = useAppStore((s) => s.markAllNotificationsRead);
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unread = notifications.filter((n) => !n.read).length;
@@ -107,7 +119,11 @@ function NotificationBell() {
                     <li key={n.id}>
                       <button
                         type="button"
-                        onClick={() => markRead(n.id)}
+                        onClick={() => {
+                          markRead(n.id);
+                          if (n.href) router.push(n.href);
+                          setOpen(false);
+                        }}
                         className={cn(
                           "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-subtle",
                           !n.read && "bg-accent-soft/40",
@@ -139,6 +155,9 @@ function NotificationBell() {
               </ul>
             )}
           </div>
+          <button type="button" onClick={() => { router.push("/notifications"); setOpen(false); }} className="w-full border-t border-border px-4 py-2.5 text-center text-xs font-medium text-accent hover:bg-surface-subtle">
+            Ver todas las notificaciones
+          </button>
         </div>
       ) : null}
     </div>

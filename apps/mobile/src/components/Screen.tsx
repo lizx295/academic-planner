@@ -17,20 +17,23 @@ export function Screen({ children, title, subtitle, action }: PropsWithChildren<
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 110 }]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
-        <View style={styles.headingCopy}>
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-          {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
+      <View style={styles.inner}>
+        <View style={styles.header}>
+          <View style={styles.headingCopy}>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
+          </View>
+          {action}
         </View>
-        {action}
+        {children}
       </View>
-      {children}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, gap: 16 },
+  content: { paddingHorizontal: 18 },
+  inner: { width: "100%", maxWidth: 724, alignSelf: "center", gap: 16 },
   header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 4 },
   headingCopy: { flex: 1 },
   title: { fontSize: 27, lineHeight: 32, fontWeight: "700", letterSpacing: -0.8 },

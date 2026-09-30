@@ -14,7 +14,7 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   browserClient = url && key
     ? createClient(url, key, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       })
     : null;
   return browserClient;

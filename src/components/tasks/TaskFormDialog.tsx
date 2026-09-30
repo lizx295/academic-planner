@@ -31,14 +31,16 @@ export function TaskFormDialog({ open, onClose, courses, task }: TaskFormDialogP
 
   useEffect(() => {
     if (!open) return;
-    setTitle(task?.title ?? "");
-    setDescription(task?.description ?? "");
-    setCourseId(task?.courseId ?? "");
-    setDueDate(task?.dueDate ?? todayISO());
-    setDueTime(task?.dueTime ?? "23:59");
-    setPriority(task?.priority ?? "medium");
-    setStatus(task?.status ?? "pending");
-    setErrors({});
+    queueMicrotask(() => {
+      setTitle(task?.title ?? "");
+      setDescription(task?.description ?? "");
+      setCourseId(task?.courseId ?? "");
+      setDueDate(task?.dueDate ?? todayISO());
+      setDueTime(task?.dueTime ?? "23:59");
+      setPriority(task?.priority ?? "medium");
+      setStatus(task?.status ?? "pending");
+      setErrors({});
+    });
   }, [open, task]);
 
   function submit() {

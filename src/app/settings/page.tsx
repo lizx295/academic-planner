@@ -26,6 +26,8 @@ import { Dialog } from "@/components/ui/Dialog";
 import { ImportDialog } from "@/components/import/ImportDialog";
 import { UniversitySelect } from "@/components/settings/UniversitySelect";
 import { IntegrationsCard } from "@/components/settings/IntegrationsCard";
+import { NotificationSettingsCard } from "@/components/settings/NotificationSettingsCard";
+import { AccountCard } from "@/components/settings/AccountCard";
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: "system", label: "Sistema" },
@@ -75,10 +77,12 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    setName(profile.name);
-    setUniversity(profile.university);
-    setProgram(profile.program);
-    setStudentId(profile.studentId);
+    queueMicrotask(() => {
+      setName(profile.name);
+      setUniversity(profile.university);
+      setProgram(profile.program);
+      setStudentId(profile.studentId);
+    });
   }, [profile.name, profile.university, profile.program, profile.studentId]);
 
   function exportData() {
@@ -119,6 +123,8 @@ export default function SettingsPage() {
         subtitle="Personaliza la app, tus datos y el respaldo."
       />
 
+      <AccountCard />
+
       <Card className="p-4 sm:p-5">
         <CardHeader
           title={
@@ -143,6 +149,8 @@ export default function SettingsPage() {
       </Card>
 
       <IntegrationsCard />
+
+      <NotificationSettingsCard />
 
       <Card className="p-4 sm:p-5">
         <CardHeader

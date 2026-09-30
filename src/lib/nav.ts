@@ -7,6 +7,8 @@ import {
   Settings,
   BookOpen,
   UserCheck,
+  Bell,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,7 +42,11 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "Espacio",
-    items: [{ href: "/notes", label: "Workspace", icon: NotebookPen }],
+    items: [
+      { href: "/inbox", label: "Bandeja", icon: Inbox },
+      { href: "/notifications", label: "Notificaciones", icon: Bell },
+      { href: "/notes", label: "Workspace", icon: NotebookPen },
+    ],
   },
 ];
 
@@ -65,6 +71,8 @@ export const MOBILE_NAV_ITEMS: NavItem[] = [
 
 /** Rutas agrupadas bajo el botón "Más" en móvil. */
 export const MOBILE_MORE_ITEMS: NavItem[] = [
+  { href: "/inbox", label: "Bandeja", icon: Inbox },
+  { href: "/notifications", label: "Notificaciones", icon: Bell },
   { href: "/assessments", label: "Evaluaciones", icon: ClipboardList },
   { href: "/attendance", label: "Asistencia", icon: UserCheck },
   { href: "/notes", label: "Workspace", icon: NotebookPen },

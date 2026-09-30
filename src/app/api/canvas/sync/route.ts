@@ -4,9 +4,14 @@ import {
   normalizeCanvasData,
   type CanvasAssignment,
   type CanvasAssignmentGroup,
+  type CanvasAnnouncement,
+  type CanvasConversation,
   type CanvasCourse,
+  type CanvasFile,
+  type CanvasModule,
   type CanvasProfile,
   type CanvasQuiz,
+  type CanvasSubmission,
 } from "@/lib/canvas";
 import {
   authenticatedUserId,
@@ -74,14 +79,18 @@ async function canvasList<T>(path: string, token: string): Promise<T[]> {
   return output;
 }
 
-async function gradingDataForCourses(courses: CanvasCourse[], token: string) {
+async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
   const assignmentsByCourse = new Map<number, CanvasAssignment[]>();
   const assignmentGroupsByCourse = new Map<number, CanvasAssignmentGroup[]>();
   const quizzesByCourse = new Map<number, CanvasQuiz[]>();
-  for (let start = 0; start < courses.length; start += 5) {
-    const batch = courses.slice(start, start + 5);
+  const newQuizzesByCourse = new Map<number, CanvasQuiz[]>();
+  const modulesByCourse = new Map<number, CanvasModule[]>();
+  const filesByCourse = new Map<number, CanvasFile[]>();
+  const announcements: CanvasAnnouncement[] = [];
+  for (let start = 0; start < courses.length; start += 3) {
+    const batch = courses.slice(start, start + 3);
     await Promise.all(batch.map(async (course) => {
-      const [assignments, assignmentGroups, quizzes] = await Promise.all([
+      const [rawAssignments, assignmentGroups, quizzes, newQuizzes, modules, files, submissions, courseAnnouncements] = await Promise.all([
         canvasList<CanvasAssignment>(
           `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
           token,
@@ -94,13 +103,45 @@ async function gradingDataForCourses(courses: CanvasCourse[], token: string) {
           `/api/v1/courses/${course.id}/quizzes?per_page=100`,
           token,
         ).catch(() => []),
+        canvasList<CanvasQuiz>(
+          `/api/quiz/v1/courses/${course.id}/quizzes?per_page=100`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasModule>(
+          `/api/v1/courses/${course.id}/modules?per_page=100&include[]=items&include[]=content_details`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasFile>(
+          `/api/v1/courses/${course.id}/files?per_page=100&sort=updated_at&order=desc`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasSubmission>(
+          `/api/v1/courses/${course.id}/students/submissions?student_ids[]=self&per_page=100&include[]=submission_comments`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasAnnouncement>(
+          `/api/v1/announcements?context_codes[]=course_${course.id}&per_page=100`,
+          token,
+        ).catch(() => []),
       ]);
+      const submissionByAssignment = new Map(submissions.map((submission) => [submission.assignment_id, submission]));
+      const assignments = rawAssignments.map((assignment) => ({
+        ...assignment,
+        submission: {
+          ...(assignment.submission ?? {}),
+          ...(submissionByAssignment.get(assignment.id) ?? {}),
+        },
+      }));
       assignmentsByCourse.set(course.id, assignments);
       assignmentGroupsByCourse.set(course.id, assignmentGroups);
       quizzesByCourse.set(course.id, quizzes);
+      newQuizzesByCourse.set(course.id, newQuizzes);
+      modulesByCourse.set(course.id, modules);
+      filesByCourse.set(course.id, files);
+      announcements.push(...courseAnnouncements);
     }));
   }
-  return { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse };
+  return { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse, newQuizzesByCourse, modulesByCourse, filesByCourse, announcements };
 }
 
 function errorResponse(error: unknown) {
@@ -111,13 +152,43 @@ function errorResponse(error: unknown) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function allowedOrigins(): Set<string> {
+  const configured = (process.env.LOCAL_API_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (process.env.NODE_ENV !== "production") {
+    configured.push("http://localhost:8081", "http://127.0.0.1:8081", "http://localhost:19006");
+  }
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) configured.push(appUrl);
+  return new Set(configured.map((value) => {
+    try { return new URL(value).origin; } catch { return value; }
+  }));
+}
+
+function cors(response: NextResponse, request: Request): NextResponse {
+  const origin = request.headers.get("origin");
+  if (origin && allowedOrigins().has(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Vary", "Origin");
+  }
+  response.headers.set("Access-Control-Allow-Headers", "authorization, content-type");
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  return response;
+}
+
+export function OPTIONS(request: Request) {
+  return cors(new NextResponse(null, { status: 204 }), request);
+}
+
 export async function GET(request: Request) {
   try {
     const userId = await authenticatedUserId(request);
-    if (!userId) return NextResponse.json({ connected: false });
-    return NextResponse.json({ connected: await hasStoredCanvasToken(userId) });
+    if (!userId) return cors(NextResponse.json({ connected: false }), request);
+    return cors(NextResponse.json({ connected: await hasStoredCanvasToken(userId) }), request);
   } catch (error) {
-    return errorResponse(error);
+    return cors(errorResponse(error), request);
   }
 }
 
@@ -126,9 +197,9 @@ export async function DELETE(request: Request) {
     const userId = await authenticatedUserId(request);
     if (!userId) throw new CanvasApiError("Debes conectar Supabase para eliminar el token guardado.", 401);
     await deleteCanvasToken(userId);
-    return NextResponse.json({ connected: false });
+    return cors(NextResponse.json({ connected: false }), request);
   } catch (error) {
-    return errorResponse(error);
+    return cors(errorResponse(error), request);
   }
 }
 
@@ -147,29 +218,46 @@ export async function POST(request: Request) {
     const token = providedToken || (userId ? await loadCanvasToken(userId) : null);
     if (!token) throw new CanvasApiError("Escribe tu token personal de Canvas para sincronizar.", 400);
 
-    const [profileResponse, courses] = await Promise.all([
+    const [profileResponse, courses, conversations] = await Promise.all([
       canvasRequest<CanvasProfile>("/api/v1/users/self/profile", token),
       canvasList<CanvasCourse>(
-        "/api/v1/courses?per_page=100&enrollment_state=active&include[]=term&include[]=teachers&include[]=total_scores",
+        "/api/v1/courses?per_page=100&enrollment_state=active&include[]=term&include[]=teachers&include[]=total_scores&include[]=course_progress",
         token,
       ),
+      canvasList<CanvasConversation>(
+        "/api/v1/conversations?scope=inbox&per_page=100",
+        token,
+      ).catch(() => []),
     ]);
     if (courses.length === 0) {
       throw new CanvasApiError("Canvas no devolvió materias activas; no se modificaron tus datos locales.", 422);
     }
-    const { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse } = await gradingDataForCourses(courses, token);
+    const {
+      assignmentsByCourse,
+      assignmentGroupsByCourse,
+      quizzesByCourse,
+      newQuizzesByCourse,
+      modulesByCourse,
+      filesByCourse,
+      announcements,
+    } = await canvasDataForCourses(courses, token);
 
     if (userId && remember && providedToken) await saveCanvasToken(userId, providedToken);
     else if (userId && !providedToken) await markCanvasTokenSynced(userId);
 
-    return NextResponse.json(normalizeCanvasData(
+    return cors(NextResponse.json(normalizeCanvasData(
       profileResponse.data,
       courses,
       assignmentsByCourse,
       assignmentGroupsByCourse,
       quizzesByCourse,
-    ));
+      newQuizzesByCourse,
+      modulesByCourse,
+      filesByCourse,
+      announcements,
+      conversations,
+    )), request);
   } catch (error) {
-    return errorResponse(error);
+    return cors(errorResponse(error), request);
   }
 }

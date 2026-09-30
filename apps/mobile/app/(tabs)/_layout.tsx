@@ -32,7 +32,7 @@ export default function TabsLayout() {
       })}
     >
       <Tabs.Screen name="index" options={{ title: "Inicio" }} />
-      <Tabs.Screen name="calendar" options={{ title: "Calendario" }} />
+      <Tabs.Screen name="calendar" options={{ title: "Agenda" }} />
       <Tabs.Screen name="courses" options={{ title: "Materias" }} />
       <Tabs.Screen name="tasks" options={{ title: "Tareas" }} />
       <Tabs.Screen name="settings" options={{ title: "Más" }} />

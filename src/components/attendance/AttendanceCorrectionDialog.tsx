@@ -35,7 +35,7 @@ export function AttendanceCorrectionDialog({
   const [status, setStatus] = useState<AttendanceStatus>("present");
 
   useEffect(() => {
-    if (record) setStatus(record.status);
+    if (record) queueMicrotask(() => setStatus(record.status));
   }, [record]);
 
   const open = Boolean(record);

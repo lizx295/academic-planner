@@ -1,9 +1,9 @@
-import { emptyPlannerSnapshot, type PlannerSnapshot } from "@academic-planner/core";
+import { academicDateKey, emptyPlannerSnapshot, type PlannerSnapshot } from "@academic-planner/core";
 
 function day(offset: number) {
   const date = new Date();
   date.setDate(date.getDate() + offset);
-  return date.toISOString().slice(0, 10);
+  return academicDateKey(date);
 }
 
 export function createMobileDemo(): PlannerSnapshot {

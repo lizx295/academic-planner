@@ -15,7 +15,6 @@ import {
 import { useSemesterData } from "@/hooks/useSemesterData";
 import { courseColorClasses } from "@/lib/colors";
 import { cn } from "@/lib/utils";
-import type { CourseColor } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";

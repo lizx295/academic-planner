@@ -19,6 +19,9 @@ import {
   Plus,
   Trash2,
   User,
+  CircleCheck,
+  ListTree,
+  Lock,
 } from "lucide-react";
 
 import { useAppStore } from "@/store/app";
@@ -59,6 +62,7 @@ type Tab =
   | "tareas"
   | "evaluaciones"
   | "calificaciones"
+  | "contenidos"
   | "materiales"
   | "workspace";
 
@@ -69,6 +73,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "tareas", label: "Tareas" },
   { id: "evaluaciones", label: "Evaluaciones" },
   { id: "calificaciones", label: "Calificaciones" },
+  { id: "contenidos", label: "Módulos" },
   { id: "materiales", label: "Materiales" },
   { id: "workspace", label: "Workspace" },
 ];
@@ -96,6 +101,8 @@ export default function CourseDetailPage() {
   const classrooms = useAppStore((s) => s.classrooms);
   const semesters = useAppStore((s) => s.semesters);
   const materials = useAppStore((s) => s.materials);
+  const modules = useAppStore((s) => s.modules);
+  const moduleItems = useAppStore((s) => s.moduleItems);
   const notionWorkspaces = useAppStore((s) => s.notionWorkspaces);
   const deleteCourse = useAppStore((s) => s.deleteCourse);
   const deleteTask = useAppStore((s) => s.deleteTask);
@@ -157,6 +164,18 @@ export default function CourseDetailPage() {
     () => materials.filter((m) => m.courseId === courseId).sort((a, b) => a.title.localeCompare(b.title)),
     [materials, courseId],
   );
+  const courseModules = useMemo(
+    () => modules.filter((item) => item.courseId === courseId).sort((a, b) => a.position - b.position),
+    [modules, courseId],
+  );
+  const itemsByModule = useMemo(() => {
+    const grouped = new Map<string, typeof moduleItems>();
+    for (const item of moduleItems.filter((entry) => entry.courseId === courseId)) {
+      grouped.set(item.moduleId, [...(grouped.get(item.moduleId) ?? []), item]);
+    }
+    for (const items of grouped.values()) items.sort((a, b) => a.position - b.position);
+    return grouped;
+  }, [moduleItems, courseId]);
   const workspace = useMemo(
     () => notionWorkspaces.find((w) => w.courseId === courseId),
     [notionWorkspaces, courseId],
@@ -281,7 +300,7 @@ export default function CourseDetailPage() {
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          {course.source !== "canvas" ? <div className="flex shrink-0 items-center gap-1.5">
             <Button size="sm" onClick={() => setFormOpen(true)}>
               <Pencil size={14} /> Editar
             </Button>
@@ -293,7 +312,7 @@ export default function CourseDetailPage() {
             >
               <Trash2 size={16} />
             </IconButton>
-          </div>
+          </div> : null}
         </div>
       </div>
 
@@ -680,14 +699,14 @@ export default function CourseDetailPage() {
                           {m.url}
                         </a>
                       </div>
-                      <IconButton
+                      {m.source !== "canvas" ? <IconButton
                         aria-label="Eliminar material"
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => deleteMaterial(m.id)}
                       >
                         <Trash2 size={14} />
-                      </IconButton>
+                      </IconButton> : null}
                     </div>
                   );
                 })}
@@ -699,6 +718,42 @@ export default function CourseDetailPage() {
               </>
             )}
           </Card>
+        ) : null}
+
+        {tab === "contenidos" ? (
+          <div className="space-y-4">
+            {courseModules.length === 0 ? (
+              <EmptyState icon={<ListTree size={22} />} title="Sin módulos visibles" description="Canvas no devolvió módulos publicados para esta materia." />
+            ) : courseModules.map((module) => {
+              const items = itemsByModule.get(module.id) ?? [];
+              const completed = items.filter((item) => item.completed).length;
+              return (
+                <Card key={module.id} className="overflow-hidden">
+                  <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-text">{module.name}</p>
+                      <p className="mt-1 text-xs text-text-faint">{completed} de {items.length || module.itemsCount} elementos completados{module.requireSequentialProgress ? " · orden obligatorio" : ""}</p>
+                    </div>
+                    <Badge tone={module.state === "completed" ? "success" : module.state === "locked" ? "neutral" : "accent"}>{module.state === "completed" ? "Completado" : module.state === "locked" ? "Bloqueado" : "Disponible"}</Badge>
+                  </div>
+                  <ol className="divide-y divide-border">
+                    {items.map((item) => (
+                      <li key={item.id} className="flex items-center gap-3 px-4 py-3">
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.completed ? "bg-present-soft text-present" : "bg-surface-subtle text-text-faint"}`}>
+                          {item.locked ? <Lock size={14} /> : item.completed ? <CircleCheck size={15} /> : <FileText size={14} />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-text">{item.title}</p>
+                          <p className="text-xs text-text-faint">{item.kind}{item.required ? " · requerido" : ""}</p>
+                        </div>
+                        {item.externalUrl && !item.locked ? <a href={item.externalUrl} target="_blank" rel="noreferrer" className="text-text-faint hover:text-accent" aria-label={`Abrir ${item.title} en Canvas`}><ExternalLink size={15} /></a> : null}
+                      </li>
+                    ))}
+                  </ol>
+                </Card>
+              );
+            })}
+          </div>
         ) : null}
 
         {tab === "workspace" ? (

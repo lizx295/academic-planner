@@ -10,6 +10,9 @@ import {
   Gauge,
   ListChecks,
   RotateCcw,
+  CheckCircle2,
+  MessageSquare,
+  Paperclip,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -192,6 +195,48 @@ export function ActivityDetails({ activity }: { activity: AcademicActivity }) {
         <div className="rounded-xl border border-pending/25 bg-pending-soft px-3.5 py-3 text-[13px] text-pending">
           {activity.lockExplanation || "Esta actividad todavía no está disponible para el estudiante."}
         </div>
+      ) : null}
+
+      {activity.submissionState || activity.submittedAt || activity.missing || activity.late ? (
+        <section className="rounded-xl border border-border px-3.5 py-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-text"><CheckCircle2 size={15} className="text-text-faint" /> Tu entrega</h3>
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-text-muted">
+            <p><span className="font-medium text-text">Estado:</span> {activity.missing ? "No entregada" : activity.submissionState?.replaceAll("_", " ") || "Registrada"}</p>
+            {activity.submittedAt ? <p><span className="font-medium text-text">Enviada:</span> {formatCanvasDateTime(activity.submittedAt)}</p> : null}
+            {activity.attempt != null ? <p><span className="font-medium text-text">Intento:</span> {activity.attempt}</p> : null}
+            {activity.late ? <Badge tone="warning">Entrega tardía</Badge> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {activity.attachments && activity.attachments.length > 0 ? (
+        <section>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-text"><Paperclip size={15} className="text-text-faint" /> Archivos entregados</h3>
+          <div className="mt-2 divide-y divide-border rounded-xl border border-border">
+            {activity.attachments.map((attachment) => (
+              <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm text-text hover:bg-surface-subtle">
+                <span className="truncate">{attachment.name}</span><ExternalLink size={13} className="shrink-0 text-text-faint" />
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {activity.feedback && activity.feedback.length > 0 ? (
+        <section>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-text"><MessageSquare size={15} className="text-text-faint" /> Comentarios y retroalimentación</h3>
+          <div className="mt-2 space-y-2">
+            {activity.feedback.map((comment) => (
+              <div key={comment.id} className="rounded-xl border border-border px-3.5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-text">{comment.author}</span>
+                  {comment.createdAt ? <span className="text-text-faint">{formatCanvasDateTime(comment.createdAt)}</span> : null}
+                </div>
+                <div className="mt-2"><TextWithLinks text={comment.comment} /></div>
+              </div>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <section>

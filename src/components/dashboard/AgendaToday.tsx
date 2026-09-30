@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarX2, Clock } from "lucide-react";
+import { ACADEMIC_TIME_ZONE, academicDateKey } from "@academic-planner/core";
 
 import { Card, CardHeader } from "@/components/ui/Card";
 import { useSemesterData } from "@/hooks/useSemesterData";
@@ -20,13 +21,14 @@ export function AgendaToday() {
   const { activeSchedules, courses, classrooms, personalEvents } = useSemesterData();
   const now = useNow();
 
-  const todayMin = now.getHours() * 60 + now.getMinutes();
-  const todayDow = now.getDay();
+  const clockParts = new Intl.DateTimeFormat("en-US", { timeZone: ACADEMIC_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const clockValue = (type: "hour" | "minute") => Number(clockParts.find((part) => part.type === type)?.value ?? 0);
+  const today = academicDateKey(now);
+  const todayMin = clockValue("hour") * 60 + clockValue("minute");
+  const todayDow = new Date(`${today}T12:00:00`).getDay();
 
   const sessions = activeSchedules.filter((s) => s.weekday === todayDow);
-  const todayEvents = personalEvents.filter(
-    (e) => now.toISOString().slice(0, 10) >= e.date && now.toISOString().slice(0, 10) <= e.date,
-  );
+  const todayEvents = personalEvents.filter((event) => event.date === today);
 
   const items: Array<{
     key: string;
