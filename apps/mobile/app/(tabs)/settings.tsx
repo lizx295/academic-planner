@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { Card, SectionTitle } from "@/components/Card";
-import { enableMobileNotifications } from "@/components/NotificationManager";
+import { enableMobileNotifications, sendTestMobileNotification } from "@/components/NotificationManager";
 import { Screen } from "@/components/Screen";
 import { StatusPill } from "@/components/StatusPill";
 import { useMobileAuth } from "@/store/auth";
@@ -98,6 +98,21 @@ export default function SettingsScreen() {
         <Pressable onPress={() => router.push("/notifications" as never)} style={[styles.linkRow, { borderBottomColor: colors.border }]}><Ionicons name="notifications-outline" size={19} color={colors.accent} /><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Notificaciones</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>Recordatorios y avisos recientes</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>
         <Pressable onPress={() => router.push("/inbox" as never)} style={[styles.linkRow, { borderBottomColor: colors.border }]}><Ionicons name="mail-outline" size={19} color={colors.accent} /><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Bandeja Canvas</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>{snapshot.conversations.filter((item) => !item.read).length + snapshot.announcements.filter((item) => !item.read).length} sin leer</Text></View><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>
         <View style={styles.toggleRow}><View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>Avisos en este dispositivo</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>24 y 2 horas antes de cada entrega</Text></View><Switch value={snapshot.notificationPreferences.mobile} onValueChange={(value) => { void toggleNotifications(value); }} trackColor={{ false: colors.borderStrong, true: colors.accentSoft }} thumbColor={snapshot.notificationPreferences.mobile ? colors.accent : colors.textFaint} /></View>
+        {([
+          ["announcements", "Anuncios", "Comunicados nuevos de tus materias"],
+          ["messages", "Mensajes", "Conversaciones de Canvas sin leer"],
+          ["discussions", "Foros", "Respuestas y actividad nueva"],
+          ["contentUpdates", "Contenido", "Páginas, archivos y módulos nuevos"],
+          ["deadlines", "Entregas", "Recordatorios antes del vencimiento"],
+        ] as const).map(([key, label, description]) => (
+          <View key={key} style={[styles.preferenceRow, { borderTopColor: colors.border }]}>
+            <View style={styles.linkCopy}><Text style={[styles.linkTitle, { color: colors.text }]}>{label}</Text><Text style={[styles.linkMeta, { color: colors.textMuted }]}>{description}</Text></View>
+            <Switch value={snapshot.notificationPreferences[key]} onValueChange={(value) => { void updateNotificationPreferences({ [key]: value }); }} trackColor={{ false: colors.borderStrong, true: colors.accentSoft }} thumbColor={snapshot.notificationPreferences[key] ? colors.accent : colors.textFaint} />
+          </View>
+        ))}
+        {snapshot.notificationPreferences.mobile && Platform.OS !== "web" ? (
+          <Pressable onPress={() => { void sendTestMobileNotification().then((shown) => Alert.alert(shown ? "Prueba enviada" : "Sin permiso", shown ? "Revisa las notificaciones del sistema." : "Habilita las notificaciones en los ajustes del dispositivo.")); }} style={[styles.secondaryButton, { borderColor: colors.borderStrong }]}><Ionicons name="notifications-circle-outline" size={17} color={colors.textMuted} /><Text style={[styles.secondaryText, { color: colors.textMuted }]}>Probar notificación del sistema</Text></Pressable>
+        ) : null}
       </Card>
 
       <Card>
@@ -170,6 +185,7 @@ const styles = StyleSheet.create({
   secondaryText: { fontSize: 13, fontWeight: "700" },
   linkRow: { minHeight: 62, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: 11 },
   toggleRow: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 12 },
+  preferenceRow: { minHeight: 60, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 12 },
   linkCopy: { flex: 1 },
   linkTitle: { fontSize: 13, fontWeight: "700" },
   linkMeta: { marginTop: 3, fontSize: 11 },

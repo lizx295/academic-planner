@@ -23,6 +23,7 @@ export function useSemesterData() {
   const notionWorkspaces = useAppStore((s) => s.notionWorkspaces);
   const materials = useAppStore((s) => s.materials);
   const personalEvents = useAppStore((s) => s.personalEvents);
+  const dashboardItems = useAppStore((s) => s.dashboardItems);
 
   const semester = useMemo(
     () => useAppStore.getState().semesters.find((s) => s.id === activeSemesterId),
@@ -66,6 +67,11 @@ export function useSemesterData() {
     [notionWorkspaces, activeCourseIds],
   );
 
+  const activeDashboardItems = useMemo(
+    () => dashboardItems.filter((item) => !item.courseId || activeCourseIds.has(item.courseId)),
+    [dashboardItems, activeCourseIds],
+  );
+
   return {
     activeSemesterId,
     semester,
@@ -88,5 +94,7 @@ export function useSemesterData() {
     materials,
     activeMaterials,
     personalEvents,
+    dashboardItems,
+    activeDashboardItems,
   };
 }

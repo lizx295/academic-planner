@@ -16,6 +16,7 @@ import type {
   CanvasModuleItem as PlannerModuleItem,
   InboxConversation,
   Material,
+  DashboardItem,
 } from "@/types";
 
 const COLORS: CourseColor[] = ["indigo", "sky", "emerald", "amber", "rose", "violet", "slate"];
@@ -136,6 +137,61 @@ export interface CanvasModule {
   items?: CanvasModuleItem[];
 }
 
+export interface CanvasPage {
+  page_id: number;
+  url?: string;
+  title?: string;
+  body?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  publish_at?: string | null;
+  html_url?: string;
+  published?: boolean;
+}
+
+export interface CanvasDiscussionTopic {
+  id: number;
+  title?: string;
+  message?: string | null;
+  html_url?: string;
+  posted_at?: string | null;
+  delayed_post_at?: string | null;
+  last_reply_at?: string | null;
+  discussion_subentry_count?: number;
+  read_state?: "read" | "unread";
+  unread_count?: number;
+  assignment?: { id?: number; due_at?: string | null; points_possible?: number | null } | null;
+}
+
+export interface CanvasPlannerItem {
+  plannable_id: number | string;
+  plannable_type?: string;
+  plannable_date?: string | null;
+  html_url?: string;
+  course_id?: number | null;
+  context_type?: string;
+  context_name?: string;
+  new_activity?: boolean;
+  submissions?: false | { submitted?: boolean; graded?: boolean };
+  planner_override?: { marked_complete?: boolean } | null;
+  plannable?: {
+    id?: number | string;
+    title?: string;
+    name?: string;
+    details?: string | null;
+    description?: string | null;
+    message?: string | null;
+    points_possible?: number | null;
+    due_at?: string | null;
+    todo_date?: string | null;
+    start_at?: string | null;
+    end_at?: string | null;
+    posted_at?: string | null;
+    course_id?: number | null;
+    html_url?: string;
+  };
+}
+
 export interface CanvasAnnouncement {
   id: number;
   title?: string;
@@ -168,6 +224,10 @@ export interface CanvasFile {
   "content-type"?: string;
   hidden_for_user?: boolean;
   locked_for_user?: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  unlock_at?: string | null;
+  size?: number | null;
 }
 
 export interface CanvasAssignmentGroup {
@@ -293,6 +353,18 @@ function priorityFor(dueAt: string | null | undefined): TaskPriority {
   return "low";
 }
 
+function dashboardKind(value: string | undefined): DashboardItem["kind"] {
+  const kind = (value ?? "").toLowerCase();
+  if (kind === "assignment" || kind === "sub_assignment") return "assignment";
+  if (kind === "quiz") return "quiz";
+  if (kind === "announcement") return "announcement";
+  if (kind === "discussion_topic") return "discussion";
+  if (kind === "wiki_page") return "page";
+  if (kind === "calendar_event") return "calendar_event";
+  if (kind === "planner_note") return "planner_note";
+  return "other";
+}
+
 function folded(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -406,8 +478,11 @@ export function normalizeCanvasData(
   newQuizzesByCourse: Map<number, CanvasQuiz[]> = new Map(),
   modulesByCourse: Map<number, CanvasModule[]> = new Map(),
   filesByCourse: Map<number, CanvasFile[]> = new Map(),
+  pagesByCourse: Map<number, CanvasPage[]> = new Map(),
+  discussionsByCourse: Map<number, CanvasDiscussionTopic[]> = new Map(),
   canvasAnnouncements: CanvasAnnouncement[] = [],
   canvasConversations: CanvasConversation[] = [],
+  canvasPlannerItems: CanvasPlannerItem[] = [],
 ): CanvasSyncPayload {
   const now = new Date();
   const fallbackEnd = new Date(now);
@@ -667,10 +742,12 @@ export function normalizeCanvasData(
           externalId: String(item.id),
         });
         if (externalUrl && ["File", "Page", "ExternalUrl", "ExternalTool"].includes(kind)) {
-          const id = `canvas-material-module-${item.id}`;
+          const resourceId = item.content_id ?? item.id;
+          const resourceType = kind === "File" ? "file" : kind === "Page" ? "page" : "external";
+          const id = `canvas-material-${resourceType}-${resourceId}`;
           if (!materialIds.has(id)) {
             materialIds.add(id);
-            materials.push({ id, courseId, title: cleanCanvasLabel(item.title) || "Recurso", kind: kind === "File" ? "doc" : "link", url: externalUrl, source: "canvas", externalId: String(item.id), moduleId });
+            materials.push({ id, courseId, title: cleanCanvasLabel(item.title) || "Recurso", kind: kind === "File" ? "doc" : "link", url: externalUrl, source: "canvas", externalId: String(resourceId), moduleId, canvasType: resourceType });
           }
         }
       }
@@ -678,13 +755,50 @@ export function normalizeCanvasData(
     for (const file of filesByCourse.get(course.id) ?? []) {
       if (!file.url || file.hidden_for_user || file.locked_for_user) continue;
       const id = `canvas-material-file-${file.id}`;
-      if (materialIds.has(id)) continue;
-      materialIds.add(id);
       const contentType = file["content-type"] ?? "";
       const kind: Material["kind"] = contentType.includes("pdf") ? "pdf"
         : contentType.includes("presentation") || /\.(ppt|pptx)$/i.test(file.filename ?? "") ? "slides"
           : contentType.startsWith("video/") ? "video" : "doc";
-      materials.push({ id, courseId, title: file.display_name || file.filename || "Archivo", kind, url: file.url, source: "canvas", externalId: String(file.id), moduleId: null });
+      const data: Material = {
+        id, courseId, title: file.display_name || file.filename || "Archivo", kind, url: file.url,
+        source: "canvas", externalId: String(file.id), moduleId: null, canvasType: "file",
+        createdAt: file.created_at ?? null, updatedAt: file.updated_at ?? null,
+        availableAt: file.unlock_at ?? null, contentType: file["content-type"] ?? null, size: file.size ?? null,
+      };
+      const existing = materials.find((item) => item.id === id);
+      if (existing) Object.assign(existing, data, { moduleId: existing.moduleId });
+      else { materialIds.add(id); materials.push(data); }
+    }
+    for (const page of pagesByCourse.get(course.id) ?? []) {
+      if (page.published === false) continue;
+      const id = `canvas-material-page-${page.page_id}`;
+      const existing = materials.find((item) => item.id === id);
+      const url = page.html_url ?? (course.html_url && page.url ? `${course.html_url.replace(/\/$/, "")}/pages/${encodeURIComponent(page.url)}` : null);
+      if (!url) continue;
+      const patch = {
+        title: cleanCanvasLabel(page.title) || "Página",
+        description: stripHtml(page.body),
+        createdAt: page.created_at ?? null,
+        updatedAt: page.updated_at ?? null,
+        availableAt: page.publish_at ?? null,
+      };
+      if (existing) Object.assign(existing, patch);
+      else {
+        materialIds.add(id);
+        materials.push({ id, courseId, ...patch, kind: "link", url, source: "canvas", externalId: String(page.page_id), moduleId: null, canvasType: "page" });
+      }
+    }
+    for (const discussion of discussionsByCourse.get(course.id) ?? []) {
+      const id = `canvas-material-discussion-${discussion.id}`;
+      if (!discussion.html_url || materialIds.has(id)) continue;
+      materialIds.add(id);
+      materials.push({
+        id, courseId, title: cleanCanvasLabel(discussion.title) || "Foro de discusión", kind: "link",
+        url: discussion.html_url, source: "canvas", externalId: String(discussion.id), moduleId: null,
+        canvasType: "discussion", description: stripHtml(discussion.message),
+        createdAt: discussion.posted_at ?? discussion.delayed_post_at ?? null,
+        updatedAt: discussion.last_reply_at ?? discussion.posted_at ?? null,
+      });
     }
   }
 
@@ -720,6 +834,102 @@ export function normalizeCanvasData(
     externalId: String(item.id),
   }));
 
+  const dashboardItems: DashboardItem[] = [];
+  const dashboardKeys = new Set<string>();
+  const pushDashboardItem = (item: DashboardItem) => {
+    const key = `${item.kind}:${item.externalId}`;
+    if (dashboardKeys.has(key)) return;
+    dashboardKeys.add(key);
+    dashboardItems.push(item);
+  };
+  for (const item of canvasPlannerItems) {
+    const kind = dashboardKind(item.plannable_type);
+    const rawDate = item.plannable_date
+      ?? item.plannable?.due_at
+      ?? item.plannable?.todo_date
+      ?? item.plannable?.start_at
+      ?? item.plannable?.posted_at;
+    if (!rawDate) continue;
+    const date = dateAndTime(rawDate);
+    const canvasCourseId = item.course_id ?? item.plannable?.course_id ?? null;
+    const externalId = String(item.plannable_id ?? item.plannable?.id ?? rawDate);
+    const submissions = item.submissions && typeof item.submissions === "object" ? item.submissions : null;
+    pushDashboardItem({
+      id: `canvas-dashboard-${kind}-${externalId}`,
+      courseId: canvasCourseId == null ? null : courseIdByCanvasId.get(Number(canvasCourseId)) ?? null,
+      title: cleanCanvasLabel(item.plannable?.title ?? item.plannable?.name) || item.context_name || "Actividad de Canvas",
+      kind,
+      date: date.date,
+      time: date.time,
+      description: stripHtml(item.plannable?.details ?? item.plannable?.description ?? item.plannable?.message),
+      externalUrl: item.html_url ?? item.plannable?.html_url ?? null,
+      externalId,
+      source: "canvas",
+      completed: item.planner_override?.marked_complete === true || submissions?.submitted === true || submissions?.graded === true,
+      newActivity: item.new_activity === true,
+      pointsPossible: item.plannable?.points_possible ?? null,
+      endAt: item.plannable?.end_at ?? null,
+    });
+  }
+  for (const announcement of announcements) {
+    const date = dateAndTime(announcement.postedAt);
+    pushDashboardItem({
+      id: `canvas-dashboard-announcement-${announcement.externalId}`, courseId: announcement.courseId,
+      title: announcement.title, kind: "announcement", date: date.date, time: date.time,
+      description: announcement.message, externalUrl: announcement.externalUrl, externalId: announcement.externalId,
+      source: "canvas", completed: announcement.read, newActivity: !announcement.read,
+    });
+  }
+  for (const course of canvasCourses) {
+    const courseId = courseIdByCanvasId.get(course.id) ?? null;
+    for (const discussion of discussionsByCourse.get(course.id) ?? []) {
+      const rawDate = discussion.assignment?.due_at ?? discussion.delayed_post_at ?? discussion.posted_at ?? discussion.last_reply_at;
+      if (!rawDate) continue;
+      const date = dateAndTime(rawDate);
+      pushDashboardItem({
+        id: `canvas-dashboard-discussion-${discussion.id}`, courseId,
+        title: cleanCanvasLabel(discussion.title) || "Foro de discusión", kind: "discussion", date: date.date, time: date.time,
+        description: stripHtml(discussion.message), externalUrl: discussion.html_url ?? null, externalId: String(discussion.id),
+        source: "canvas", completed: discussion.read_state === "read", newActivity: (discussion.unread_count ?? 0) > 0,
+        pointsPossible: discussion.assignment?.points_possible ?? null,
+      });
+    }
+    for (const page of pagesByCourse.get(course.id) ?? []) {
+      const rawDate = page.publish_at ?? page.updated_at ?? page.created_at;
+      if (!rawDate || page.published === false) continue;
+      const date = dateAndTime(rawDate);
+      const url = page.html_url ?? (course.html_url && page.url ? `${course.html_url.replace(/\/$/, "")}/pages/${encodeURIComponent(page.url)}` : null);
+      pushDashboardItem({
+        id: `canvas-dashboard-page-${page.page_id}`, courseId,
+        title: cleanCanvasLabel(page.title) || "Página", kind: "page", date: date.date, time: date.time,
+        description: stripHtml(page.body), externalUrl: url, externalId: String(page.page_id), source: "canvas",
+        completed: false, newActivity: false,
+      });
+    }
+    for (const file of filesByCourse.get(course.id) ?? []) {
+      const rawDate = file.unlock_at ?? file.updated_at ?? file.created_at;
+      if (!rawDate || !file.url || file.hidden_for_user || file.locked_for_user) continue;
+      const date = dateAndTime(rawDate);
+      pushDashboardItem({
+        id: `canvas-dashboard-material-${file.id}`, courseId,
+        title: file.display_name || file.filename || "Archivo", kind: "material", date: date.date, time: date.time,
+        description: file["content-type"] ?? "Archivo del curso", externalUrl: file.url, externalId: String(file.id),
+        source: "canvas", completed: false, newActivity: false,
+      });
+    }
+    for (const courseModule of modulesByCourse.get(course.id) ?? []) {
+      if (!courseModule.unlock_at) continue;
+      const date = dateAndTime(courseModule.unlock_at);
+      pushDashboardItem({
+        id: `canvas-dashboard-module-${courseModule.id}`, courseId,
+        title: cleanCanvasLabel(courseModule.name) || "Módulo", kind: "module", date: date.date, time: date.time,
+        description: "Módulo disponible", externalUrl: course.html_url ?? null, externalId: String(courseModule.id), source: "canvas",
+        completed: courseModule.state === "completed", newActivity: courseModule.state === "unlocked",
+      });
+    }
+  }
+  dashboardItems.sort((a, b) => `${a.date}T${a.time ?? "23:59"}`.localeCompare(`${b.date}T${b.time ?? "23:59"}`));
+
   const semesters = [...termMap.values()];
   const activeSemesterId = courses[0]?.semesterId ?? semesters[0]?.id ?? "";
   return {
@@ -744,6 +954,13 @@ export function normalizeCanvasData(
     materials,
     announcements,
     conversations,
-    counts: { courses: courses.length, tasks: tasks.length, grades: grades.length, announcements: announcements.length, modules: modules.length },
+    dashboardItems,
+    counts: {
+      courses: courses.length, tasks: tasks.length, grades: grades.length, announcements: announcements.length,
+      modules: modules.length,
+      pages: [...pagesByCourse.values()].reduce((sum, value) => sum + value.length, 0),
+      discussions: [...discussionsByCourse.values()].reduce((sum, value) => sum + value.length, 0),
+      dashboardItems: dashboardItems.length,
+    },
   };
 }

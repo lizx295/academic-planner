@@ -32,6 +32,7 @@ import type {
   Announcement,
   InboxConversation,
   NotificationPreferences,
+  DashboardItem,
 } from "@/types";
 
 export interface CourseDraft {
@@ -68,6 +69,7 @@ interface AppStore {
   moduleItems: CanvasModuleItem[];
   announcements: Announcement[];
   conversations: InboxConversation[];
+  dashboardItems: DashboardItem[];
   notificationPreferences: NotificationPreferences;
   theme: ThemePreference;
 
@@ -411,7 +413,7 @@ setTheme: (theme) => set({ theme }),
     }),
     {
       name: "academic-planner-store",
-      version: 4,
+      version: 5,
       migrate: (persisted) => upgradeCanvasCourseSections(persisted as AppStore),
       partialize: (s) => ({
         initialized: s.initialized,
@@ -433,7 +435,8 @@ setTheme: (theme) => set({ theme }),
         modules: s.modules,
         moduleItems: s.moduleItems,
         announcements: s.announcements,
-        conversations: s.conversations,
+          conversations: s.conversations,
+          dashboardItems: s.dashboardItems,
         notificationPreferences: s.notificationPreferences,
         theme: s.theme,
       }),
@@ -480,6 +483,7 @@ export function getPersistedPlannerState() {
     moduleItems: s.moduleItems,
     announcements: s.announcements,
     conversations: s.conversations,
+    dashboardItems: s.dashboardItems,
     notificationPreferences: s.notificationPreferences,
     theme: s.theme,
   };

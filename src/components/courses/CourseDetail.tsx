@@ -161,7 +161,7 @@ export default function CourseDetailPage() {
     [assessments, grades, course],
   );
   const courseMaterials = useMemo(
-    () => materials.filter((m) => m.courseId === courseId).sort((a, b) => a.title.localeCompare(b.title)),
+    () => materials.filter((m) => m.courseId === courseId).sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? "") || a.title.localeCompare(b.title)),
     [materials, courseId],
   );
   const courseModules = useMemo(
@@ -689,12 +689,16 @@ export default function CourseDetailPage() {
                         <Icon size={16} aria-hidden="true" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-text">{m.title}</p>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-sm font-medium text-text">{m.title}</p>
+                          {m.canvasType ? <Badge tone="neutral">{m.canvasType === "discussion" ? "Foro" : m.canvasType === "page" ? "Página" : m.canvasType === "file" ? "Archivo" : "Enlace"}</Badge> : null}
+                        </div>
+                        {m.description ? <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-text-muted">{m.description}</p> : null}
                         <a
                           href={m.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="truncate text-xs text-text-faint hover:text-accent"
+                          className="mt-1 block truncate text-xs text-text-faint hover:text-accent"
                         >
                           {m.url}
                         </a>

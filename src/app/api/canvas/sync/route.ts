@@ -9,6 +9,9 @@ import {
   type CanvasCourse,
   type CanvasFile,
   type CanvasModule,
+  type CanvasPage,
+  type CanvasDiscussionTopic,
+  type CanvasPlannerItem,
   type CanvasProfile,
   type CanvasQuiz,
   type CanvasSubmission,
@@ -86,11 +89,13 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
   const newQuizzesByCourse = new Map<number, CanvasQuiz[]>();
   const modulesByCourse = new Map<number, CanvasModule[]>();
   const filesByCourse = new Map<number, CanvasFile[]>();
+  const pagesByCourse = new Map<number, CanvasPage[]>();
+  const discussionsByCourse = new Map<number, CanvasDiscussionTopic[]>();
   const announcements: CanvasAnnouncement[] = [];
   for (let start = 0; start < courses.length; start += 3) {
     const batch = courses.slice(start, start + 3);
     await Promise.all(batch.map(async (course) => {
-      const [rawAssignments, assignmentGroups, quizzes, newQuizzes, modules, files, submissions, courseAnnouncements] = await Promise.all([
+      const [rawAssignments, assignmentGroups, quizzes, newQuizzes, modules, files, pages, discussions, submissions, courseAnnouncements] = await Promise.all([
         canvasList<CanvasAssignment>(
           `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
           token,
@@ -113,6 +118,14 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
         ).catch(() => []),
         canvasList<CanvasFile>(
           `/api/v1/courses/${course.id}/files?per_page=100&sort=updated_at&order=desc`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasPage>(
+          `/api/v1/courses/${course.id}/pages?per_page=100&sort=updated_at&order=desc&include[]=body`,
+          token,
+        ).catch(() => []),
+        canvasList<CanvasDiscussionTopic>(
+          `/api/v1/courses/${course.id}/discussion_topics?per_page=100&order_by=recent_activity&include[]=all_dates`,
           token,
         ).catch(() => []),
         canvasList<CanvasSubmission>(
@@ -138,10 +151,21 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
       newQuizzesByCourse.set(course.id, newQuizzes);
       modulesByCourse.set(course.id, modules);
       filesByCourse.set(course.id, files);
+      pagesByCourse.set(course.id, pages);
+      discussionsByCourse.set(course.id, discussions);
       announcements.push(...courseAnnouncements);
     }));
   }
-  return { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse, newQuizzesByCourse, modulesByCourse, filesByCourse, announcements };
+  return { assignmentsByCourse, assignmentGroupsByCourse, quizzesByCourse, newQuizzesByCourse, modulesByCourse, filesByCourse, pagesByCourse, discussionsByCourse, announcements };
+}
+
+function plannerRange(courses: CanvasCourse[]): { start: string; end: string } {
+  const now = Date.now();
+  const candidatesStart = courses.flatMap((course) => [course.term?.start_at, course.start_at]).filter((value): value is string => Boolean(value));
+  const candidatesEnd = courses.flatMap((course) => [course.term?.end_at, course.end_at]).filter((value): value is string => Boolean(value));
+  const startMs = Math.min(now - 120 * 86_400_000, ...candidatesStart.map((value) => new Date(value).getTime()).filter(Number.isFinite));
+  const endMs = Math.max(now + 240 * 86_400_000, ...candidatesEnd.map((value) => new Date(value).getTime()).filter(Number.isFinite));
+  return { start: new Date(startMs).toISOString(), end: new Date(endMs).toISOString() };
 }
 
 function errorResponse(error: unknown) {
@@ -232,6 +256,14 @@ export async function POST(request: Request) {
     if (courses.length === 0) {
       throw new CanvasApiError("Canvas no devolvió materias activas; no se modificaron tus datos locales.", 422);
     }
+    const range = plannerRange(courses);
+    const [courseData, plannerItems] = await Promise.all([
+      canvasDataForCourses(courses, token),
+      canvasList<CanvasPlannerItem>(
+        `/api/v1/planner/items?per_page=100&start_date=${encodeURIComponent(range.start)}&end_date=${encodeURIComponent(range.end)}`,
+        token,
+      ).catch(() => []),
+    ]);
     const {
       assignmentsByCourse,
       assignmentGroupsByCourse,
@@ -239,8 +271,10 @@ export async function POST(request: Request) {
       newQuizzesByCourse,
       modulesByCourse,
       filesByCourse,
+      pagesByCourse,
+      discussionsByCourse,
       announcements,
-    } = await canvasDataForCourses(courses, token);
+    } = courseData;
 
     if (userId && remember && providedToken) await saveCanvasToken(userId, providedToken);
     else if (userId && !providedToken) await markCanvasTokenSynced(userId);
@@ -254,8 +288,11 @@ export async function POST(request: Request) {
       newQuizzesByCourse,
       modulesByCourse,
       filesByCourse,
+      pagesByCourse,
+      discussionsByCourse,
       announcements,
       conversations,
+      plannerItems,
     )), request);
   } catch (error) {
     return cors(errorResponse(error), request);

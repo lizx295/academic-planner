@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Unlock,
   CalendarSync,
+  MessagesSquare,
+  FilePlus2,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
@@ -41,6 +43,8 @@ const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
   grade_posted: GraduationCap,
   module_unlocked: Unlock,
   due_changed: CalendarSync,
+  discussion: MessagesSquare,
+  content_published: FilePlus2,
 };
 
 function NotificationBell() {
@@ -121,7 +125,8 @@ function NotificationBell() {
                         type="button"
                         onClick={() => {
                           markRead(n.id);
-                          if (n.href) router.push(n.href);
+                          if (n.href?.startsWith("http")) window.location.assign(n.href);
+                          else if (n.href) router.push(n.href);
                           setOpen(false);
                         }}
                         className={cn(

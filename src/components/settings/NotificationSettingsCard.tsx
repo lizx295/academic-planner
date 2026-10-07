@@ -3,7 +3,7 @@
 import { Bell, BellRing, Clock3 } from "lucide-react";
 import { useState } from "react";
 
-import { requestBrowserNotifications } from "@/components/providers/NotificationProvider";
+import { requestBrowserNotifications, sendTestBrowserNotification } from "@/components/providers/NotificationProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Field";
@@ -31,6 +31,8 @@ export function NotificationSettingsCard() {
   const rows = [
     ["announcements", "Anuncios", "Nuevos comunicados de tus materias"],
     ["messages", "Mensajes", "Conversaciones nuevas o sin leer"],
+    ["discussions", "Foros", "Respuestas y actividad nueva en discusiones"],
+    ["contentUpdates", "Contenido del curso", "Páginas, materiales y módulos publicados"],
     ["grades", "Notas y comentarios", "Calificaciones y retroalimentación publicada"],
     ["deadlines", "Fechas de entrega", "Recordatorios 24 y 2 horas antes"],
     ["classReminders", "Clases", "Recordatorios basados en tu horario"],
@@ -71,6 +73,14 @@ export function NotificationSettingsCard() {
         <Button onClick={() => void enableBrowser()} disabled={!preferences.enabled}>
           <Bell size={15} /> {preferences.browser ? "Permiso del navegador activo" : "Activar avisos del navegador"}
         </Button>
+        {preferences.browser ? (
+          <Button
+            variant="secondary"
+            onClick={() => void sendTestBrowserNotification().then((shown) => setPermissionMessage(shown ? "Notificación de prueba enviada al sistema." : "El navegador ya no tiene permiso para mostrar avisos."))}
+          >
+            Probar notificación
+          </Button>
+        ) : null}
         {permissionMessage ? <p className="text-xs text-text-muted" role="status">{permissionMessage}</p> : null}
       </div>
     </Card>

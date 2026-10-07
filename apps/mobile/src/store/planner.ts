@@ -29,6 +29,7 @@ interface MobilePlannerStore {
   markNotificationRead: (id: string) => void;
   markAnnouncementRead: (id: string) => void;
   markConversationRead: (id: string) => void;
+  markDashboardItemRead: (id: string) => void;
 }
 
 function webApiUrl(): string {
@@ -204,6 +205,15 @@ export const usePlannerStore = create<MobilePlannerStore>((set, get) => ({
     const snapshot = {
       ...get().snapshot,
       conversations: get().snapshot.conversations.map((item) => item.id === id ? { ...item, read: true } : item),
+    };
+    set({ snapshot });
+    void persistSnapshot(snapshot);
+  },
+
+  markDashboardItemRead: (id) => {
+    const snapshot = {
+      ...get().snapshot,
+      dashboardItems: get().snapshot.dashboardItems.map((item) => item.id === id ? { ...item, newActivity: false } : item),
     };
     set({ snapshot });
     void persistSnapshot(snapshot);

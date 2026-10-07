@@ -18,6 +18,7 @@ import { TodayTasks } from "@/components/dashboard/TodayTasks";
 import { UpcomingAssessments } from "@/components/dashboard/UpcomingAssessments";
 import { PendingConfirmations } from "@/components/dashboard/PendingConfirmations";
 import { DayPreview } from "@/components/dashboard/DayPreview";
+import { ActivityBoard } from "@/components/dashboard/ActivityBoard";
 
 function WeekStrip() {
   const { activeCourses, activeSchedules, semester } = useSemesterData();
@@ -131,6 +132,7 @@ export default function DashboardPage() {
 
       <WeekStrip />
       <PendingConfirmations />
+      <ActivityBoard />
 
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">

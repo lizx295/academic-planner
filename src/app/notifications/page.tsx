@@ -33,7 +33,9 @@ export default function NotificationsPage() {
             <li key={item.id} className="group flex gap-3 py-4">
               <span aria-hidden="true" className={`mt-2 h-2 w-2 shrink-0 rounded-full ${item.read ? "bg-border-strong" : "bg-accent"}`} />
               <div className="min-w-0 flex-1">
-                {item.href ? (
+                {item.href ? item.href.startsWith("http") ? (
+                  <a href={item.href} target="_blank" rel="noreferrer" onClick={() => markRead(item.id)} className="font-medium text-text hover:text-accent">{item.title}</a>
+                ) : (
                   <Link href={item.href} onClick={() => markRead(item.id)} className="font-medium text-text hover:text-accent">{item.title}</Link>
                 ) : (
                   <button type="button" className="text-left font-medium text-text" onClick={() => markRead(item.id)}>{item.title}</button>

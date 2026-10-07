@@ -52,6 +52,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const courses = useAppStore((state) => state.courses);
   const announcements = useAppStore((state) => state.announcements);
   const conversations = useAppStore((state) => state.conversations);
+  const dashboardItems = useAppStore((state) => state.dashboardItems);
   const preferences = useAppStore((state) => state.notificationPreferences);
   const addNotification = useAppStore((state) => state.addNotification);
 
@@ -79,6 +80,29 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (preferences.messages) {
       for (const item of conversations.filter((entry) => !entry.read).slice(0, 20)) {
         generated.push(createNotification("message", `message:${item.externalId}:${item.lastMessageAt}`, item.subject || "Nuevo mensaje", item.preview, "/inbox", item.id));
+      }
+    }
+    for (const item of dashboardItems.filter((entry) => entry.newActivity)) {
+      if (item.kind === "discussion" && preferences.discussions) {
+        const course = item.courseId ? coursesById.get(item.courseId) : null;
+        generated.push(createNotification(
+          "discussion",
+          `discussion:${item.externalId}:${item.date}`,
+          "Actividad nueva en un foro",
+          `${item.title}${course ? ` · ${course.code}` : ""}`,
+          item.externalUrl ?? "/",
+          item.id,
+        ));
+      } else if (["page", "material", "module"].includes(item.kind) && preferences.contentUpdates) {
+        const course = item.courseId ? coursesById.get(item.courseId) : null;
+        generated.push(createNotification(
+          item.kind === "module" ? "module_unlocked" : "content_published",
+          `content:${item.kind}:${item.externalId}:${item.date}`,
+          item.kind === "module" ? "Módulo disponible" : "Nuevo contenido del curso",
+          `${item.title}${course ? ` · ${course.code}` : ""}`,
+          item.externalUrl ?? "/",
+          item.id,
+        ));
       }
     }
     if (preferences.deadlines) {
@@ -125,7 +149,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (notification.eventKey) knownEventKeys.add(notification.eventKey);
       if (preferences.browser && !quiet) void showBrowserNotification(notification);
     }
-  }, [tasks, assessments, grades, courses, announcements, conversations, preferences, addNotification]);
+  }, [tasks, assessments, grades, courses, announcements, conversations, dashboardItems, preferences, addNotification]);
 
   return children;
 }
@@ -134,4 +158,20 @@ export async function requestBrowserNotifications(): Promise<NotificationPermiss
   if (!("Notification" in window)) return "unsupported";
   if (Notification.permission === "granted") return "granted";
   return Notification.requestPermission();
+}
+
+export async function sendTestBrowserNotification(): Promise<boolean> {
+  if (!("Notification" in window) || Notification.permission !== "granted") return false;
+  await showBrowserNotification({
+    id: "notification-test",
+    kind: "system",
+    title: "Notificaciones activas",
+    body: "Academic Planner puede enviarte recordatorios y novedades de Canvas.",
+    createdAt: new Date().toISOString(),
+    read: false,
+    refId: null,
+    href: "/notifications",
+    eventKey: "notification-test",
+  });
+  return true;
 }

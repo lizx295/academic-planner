@@ -26,6 +26,7 @@ export default function NotificationsScreen() {
   const markNotificationRead = usePlannerStore((state) => state.markNotificationRead);
   const markAnnouncementRead = usePlannerStore((state) => state.markAnnouncementRead);
   const markConversationRead = usePlannerStore((state) => state.markConversationRead);
+  const markDashboardItemRead = usePlannerStore((state) => state.markDashboardItemRead);
   const courseById = new Map(snapshot.courses.map((course) => [course.id, course]));
 
   const rows: NotificationRow[] = [
@@ -58,6 +59,16 @@ export default function NotificationsScreen() {
       icon: "chatbubble-ellipses-outline" as const,
       href: "/inbox",
       onRead: () => markConversationRead(item.id),
+    })),
+    ...snapshot.dashboardItems.filter((item) => item.newActivity && ["discussion", "page", "material", "module"].includes(item.kind)).map((item) => ({
+      id: `dashboard:${item.id}`,
+      title: item.kind === "discussion" ? "Actividad nueva en un foro" : item.kind === "module" ? "Módulo disponible" : "Nuevo contenido del curso",
+      body: `${item.title}${item.courseId ? ` · ${courseById.get(item.courseId)?.code ?? "Canvas"}` : ""}`,
+      createdAt: `${item.date}T${item.time ?? "12:00"}:00`,
+      read: !item.newActivity,
+      icon: item.kind === "discussion" ? "chatbubbles-outline" as const : item.kind === "module" ? "folder-open-outline" as const : "document-text-outline" as const,
+      href: item.externalUrl,
+      onRead: () => markDashboardItemRead(item.id),
     })),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 

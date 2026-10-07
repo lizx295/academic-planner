@@ -23,6 +23,7 @@ import type {
   Announcement,
   InboxConversation,
   NotificationPreferences,
+  DashboardItem,
 } from "@/types";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@academic-planner/core";
 
@@ -85,6 +86,7 @@ export interface AppData {
   moduleItems: CanvasModuleItem[];
   announcements: Announcement[];
   conversations: InboxConversation[];
+  dashboardItems: DashboardItem[];
   notificationPreferences: NotificationPreferences;
 }
 
@@ -493,6 +495,7 @@ export function buildSeedData(): AppData {
     moduleItems: [],
     announcements: [],
     conversations: [],
+    dashboardItems: [],
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   };
 }
@@ -525,6 +528,7 @@ export function emptyData(): AppData {
     moduleItems: [],
     announcements: [],
     conversations: [],
+    dashboardItems: [],
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   };
 }
