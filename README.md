@@ -126,8 +126,9 @@ Opción recomendada desde el dashboard:
 1. Abre **SQL Editor > New query**.
 2. Ejecuta, en orden, el contenido de
    `supabase/migrations/202609280001_planner_states.sql` y
-   `supabase/migrations/202609290001_canvas_integrations.sql` y
-   `supabase/migrations/202609290003_accounts_notifications.sql`.
+   `supabase/migrations/202609290001_canvas_integrations.sql`,
+   `supabase/migrations/202609290003_accounts_notifications.sql` y
+   `supabase/migrations/202610070004_notification_content_categories.sql`.
 3. Comprueba en **Table Editor** que existan `planner_states` y
    `canvas_integrations`.
 
@@ -233,11 +234,21 @@ El token viaja por HTTPS al Route Handler, nunca se guarda en `localStorage` y
 nunca vuelve a enviarse al navegador después de almacenarlo.
 
 La ruta `POST /api/canvas/sync` obtiene el perfil, cursos activos, actividades,
-entregas del estudiante, comentarios del docente, módulos, archivos, anuncios y
-conversaciones. Consulta cuestionarios clásicos y New Quizzes cuando Canvas los
-expone y sigue el encabezado `Link` para paginación. En la primera sincronización
-reemplaza los datos demo; en las siguientes actualiza solo los elementos cuyo
-origen es Canvas y conserva lo creado manualmente.
+entregas del estudiante, comentarios del docente, módulos, archivos, páginas,
+foros, anuncios, eventos del Planner y conversaciones. Consulta cuestionarios
+clásicos y New Quizzes cuando Canvas los expone y sigue el encabezado `Link`
+para paginación. Los endpoints secundarios son tolerantes a permisos parciales:
+si una materia oculta, por ejemplo, la pestaña Archivos, el resto de la
+sincronización continúa. En la primera sincronización reemplaza los datos demo;
+en las siguientes actualiza solo los elementos cuyo origen es Canvas y conserva
+lo creado manualmente.
+
+El dashboard usa `GET /api/v1/planner/items` como fuente principal de su
+**Tablero** y completa la información con los endpoints de anuncios, páginas,
+foros, archivos y módulos. La vista se puede filtrar por hoy, siete o treinta
+días y evita duplicar una misma actividad aunque Canvas la devuelva también
+como tarea o evaluación. La aplicación móvil reutiliza el mismo contrato y
+muestra una lista vertical para evitar superposiciones.
 
 Todo contenido Canvas se presenta en modo **solo lectura**. Academic Planner no
 ofrece acciones para cambiar notas, instrucciones, fechas, entregas o materiales
@@ -367,7 +378,7 @@ actualizas valores en el dashboard.
 | --- | --- |
 | **Solo local** en Configuración | Faltan las variables públicas de Supabase en el build; agrégalas y redespliega. |
 | El enlace mágico vuelve al dominio equivocado | Revisa **Authentication > URL Configuration** y agrega la URL exacta de Vercel. |
-| Error de tabla o permisos | Ejecuta las tres migraciones en orden y confirma que RLS esté activo. |
+| Error de tabla o permisos | Ejecuta las cuatro migraciones en orden y confirma que RLS esté activo. |
 | HTTP 401 al sincronizar | Canvas rechazó el token personal o la sesión Supabase expiró. Genera otro token e inténtalo de nuevo. |
 | No guarda el token | Ejecuta la segunda migración y configura `SUPABASE_SECRET_KEY` y `CANVAS_TOKEN_ENCRYPTION_KEY`. |
 | Token guardado no se puede descifrar | Restaura la clave de cifrado original o elimina la integración y registra un token nuevo. |
@@ -476,9 +487,15 @@ permanecen exclusivamente en Vercel.
 
 La web incluye un centro de notificaciones, bandeja de anuncios/mensajes Canvas,
 preferencias por categoría, horas de silencio y avisos del navegador mediante
-Service Worker. El móvil usa `expo-notifications` y programa recordatorios
-locales de entregas con 24 y 2 horas de anticipación, incluso si la interfaz no
-está abierta.
+Service Worker. Las categorías incluyen anuncios, mensajes, foros, contenido
+publicado, notas, entregas y clases. El botón **Probar notificación** permite
+comprobar el permiso y la integración con el sistema operativo.
+
+El móvil usa `expo-notifications`, programa recordatorios locales de entregas
+con 24 y 2 horas de anticipación y muestra avisos del sistema al detectar
+anuncios, mensajes, actividad de foros, páginas, archivos o módulos nuevos.
+También incluye una prueba manual desde **Más > Comunicación**. Los
+identificadores ya notificados se guardan localmente para evitar repetir avisos.
 
 La migración `202609290003_accounts_notifications.sql` deja preparadas las
 tablas `notification_devices`, `notification_events` y
