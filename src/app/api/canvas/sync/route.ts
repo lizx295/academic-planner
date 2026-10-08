@@ -55,18 +55,29 @@ async function canvasRequest<T>(pathOrUrl: string, token: string): Promise<{ dat
   if (new URL(url).origin !== new URL(baseUrl).origin) {
     throw new CanvasApiError("Canvas devolvió una URL de paginación no permitida.", 502);
   }
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.ok) {
+      return { data: (await response.json()) as T, next: nextLink(response.headers.get("link")) };
+    }
+    if ((response.status === 403 || response.status === 429) && attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+      continue;
+    }
     const message = response.status === 401
       ? "Canvas rechazó el token. Revísalo o genera uno nuevo en Aula Virtual."
-      : `Canvas respondió con el estado ${response.status}.`;
-    throw new CanvasApiError(message, response.status === 401 ? 401 : 502);
+      : response.status === 403
+        ? "Canvas reconoció el token, pero no permitió consultar uno de los recursos obligatorios. Intenta sincronizar de nuevo."
+        : response.status === 429
+          ? "Canvas limitó temporalmente las consultas. Espera unos segundos e intenta de nuevo."
+          : `Canvas respondió con el estado ${response.status}.`;
+    throw new CanvasApiError(message, [401, 403, 429].includes(response.status) ? response.status : 502);
   }
-  return { data: (await response.json()) as T, next: nextLink(response.headers.get("link")) };
+  throw new CanvasApiError("Canvas no respondió después de varios intentos.", 502);
 }
 
 async function canvasList<T>(path: string, token: string): Promise<T[]> {
@@ -92,10 +103,10 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
   const pagesByCourse = new Map<number, CanvasPage[]>();
   const discussionsByCourse = new Map<number, CanvasDiscussionTopic[]>();
   const announcements: CanvasAnnouncement[] = [];
-  for (let start = 0; start < courses.length; start += 3) {
-    const batch = courses.slice(start, start + 3);
+  for (let start = 0; start < courses.length; start += 1) {
+    const batch = courses.slice(start, start + 1);
     await Promise.all(batch.map(async (course) => {
-      const [rawAssignments, assignmentGroups, quizzes, newQuizzes, modules, files, pages, discussions, submissions, courseAnnouncements] = await Promise.all([
+      const [rawAssignments, assignmentGroups, submissions] = await Promise.all([
         canvasList<CanvasAssignment>(
           `/api/v1/courses/${course.id}/assignments?per_page=100&order_by=due_at&include[]=submission`,
           token,
@@ -104,6 +115,12 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
           `/api/v1/courses/${course.id}/assignment_groups?per_page=100`,
           token,
         ),
+        canvasList<CanvasSubmission>(
+          `/api/v1/courses/${course.id}/students/submissions?student_ids[]=self&per_page=100&include[]=submission_comments`,
+          token,
+        ).catch(() => []),
+      ]);
+      const [quizzes, newQuizzes] = await Promise.all([
         canvasList<CanvasQuiz>(
           `/api/v1/courses/${course.id}/quizzes?per_page=100`,
           token,
@@ -112,12 +129,10 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
           `/api/quiz/v1/courses/${course.id}/quizzes?per_page=100`,
           token,
         ).catch(() => []),
+      ]);
+      const [modules, pages, discussions] = await Promise.all([
         canvasList<CanvasModule>(
           `/api/v1/courses/${course.id}/modules?per_page=100&include[]=items&include[]=content_details`,
-          token,
-        ).catch(() => []),
-        canvasList<CanvasFile>(
-          `/api/v1/courses/${course.id}/files?per_page=100&sort=updated_at&order=desc`,
           token,
         ).catch(() => []),
         canvasList<CanvasPage>(
@@ -128,8 +143,10 @@ async function canvasDataForCourses(courses: CanvasCourse[], token: string) {
           `/api/v1/courses/${course.id}/discussion_topics?per_page=100&order_by=recent_activity&include[]=all_dates`,
           token,
         ).catch(() => []),
-        canvasList<CanvasSubmission>(
-          `/api/v1/courses/${course.id}/students/submissions?student_ids[]=self&per_page=100&include[]=submission_comments`,
+      ]);
+      const [files, courseAnnouncements] = await Promise.all([
+        canvasList<CanvasFile>(
+          `/api/v1/courses/${course.id}/files?per_page=100&sort=updated_at&order=desc`,
           token,
         ).catch(() => []),
         canvasList<CanvasAnnouncement>(

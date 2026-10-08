@@ -380,12 +380,14 @@ actualizas valores en el dashboard.
 | El enlace mágico vuelve al dominio equivocado | Revisa **Authentication > URL Configuration** y agrega la URL exacta de Vercel. |
 | Error de tabla o permisos | Ejecuta las cuatro migraciones en orden y confirma que RLS esté activo. |
 | HTTP 401 al sincronizar | Canvas rechazó el token personal o la sesión Supabase expiró. Genera otro token e inténtalo de nuevo. |
+| HTTP 403 al sincronizar | Canvas puede limitar ráfagas de consultas o restringir Archivos/Páginas en ciertas materias. La integración reintenta y omite esos recursos opcionales; pega únicamente el token, sin barras ni caracteres adicionales al final. |
 | No guarda el token | Ejecuta la segunda migración y configura `SUPABASE_SECRET_KEY` y `CANVAS_TOKEN_ENCRYPTION_KEY`. |
 | Token guardado no se puede descifrar | Restaura la clave de cifrado original o elimina la integración y registra un token nuevo. |
 | Canvas no devuelve materias | Confirma que existan cursos activos para la cuenta y que el token pertenezca al estudiante correcto. |
 | Funciona localmente pero no en producción | Comprueba que las variables estén asignadas al entorno **Production**, no solo a Development o Preview. |
 
-Referencias oficiales: [autenticación por contraseña de
+Referencias oficiales: [límites de peticiones de
+Canvas](https://developerdocs.instructure.com/services/canvas/basics/file.throttling), [autenticación por contraseña de
 Supabase](https://supabase.com/docs/guides/auth/passwords), [claves de API
 de Supabase](https://supabase.com/docs/guides/getting-started/api-keys),
 [variables de entorno de Vercel](https://vercel.com/docs/environment-variables)
