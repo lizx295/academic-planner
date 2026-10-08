@@ -3,7 +3,7 @@
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-  CalendarDays,
+  CalendarClock,
   Clock,
   ExternalLink,
   FileText,
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { Assessment, Task } from "@/types";
+import { resolveCanvasUrl } from "@/lib/external-url";
 
 export type AcademicActivity = Task | Assessment;
 
@@ -133,14 +134,24 @@ export function ActivityDetails({ activity }: { activity: AcademicActivity }) {
 
   return (
     <div className="space-y-5">
+      <section className="rounded-2xl border border-accent/30 bg-accent-soft/45 p-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-accent shadow-sm">
+            <CalendarClock size={20} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-accent">Fecha de entrega</p>
+            <p className="mt-1 text-lg font-semibold capitalize leading-tight text-text">
+              {formatDueDate(due.date, due.time)}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={activity.source === "canvas" ? "accent" : "neutral"}>
           {activity.source === "canvas" ? "Canvas · solo lectura" : "Actividad del planificador"}
         </Badge>
-        <span className="inline-flex items-center gap-1.5 text-[13px] text-text-muted">
-          <CalendarDays size={14} aria-hidden="true" />
-          Entrega: {formatDueDate(due.date, due.time)}
-        </span>
       </div>
 
       {stats.length > 0 ? (
@@ -269,6 +280,9 @@ export function ActivityDetailsDialog({
   onClose: () => void;
 }) {
   if (!activity) return null;
+  const externalUrl = activity.source === "canvas"
+    ? resolveCanvasUrl(activity.externalUrl)
+    : activity.externalUrl;
   return (
     <Dialog
       open
@@ -278,9 +292,9 @@ export function ActivityDetailsDialog({
       size="lg"
       footer={
         <>
-          {activity.externalUrl ? (
+          {externalUrl ? (
             <a
-              href={activity.externalUrl}
+              href={externalUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent-strong"

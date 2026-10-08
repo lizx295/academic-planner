@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -18,6 +17,8 @@ import {
 import { academicDateKey, type DashboardItem, type DashboardItemKind } from "@academic-planner/core";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ActivityDetailsDialog, type AcademicActivity } from "@/components/activities/ActivityDetails";
+import { DashboardItemDetailsDialog } from "@/components/activities/DashboardItemDetails";
 import { Segmented } from "@/components/ui/Segmented";
 import { useSemesterData } from "@/hooks/useSemesterData";
 import { courseColorClasses } from "@/lib/colors";
@@ -52,9 +53,17 @@ function groupLabel(date: string, today: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function compactDateLabel(date: string, today: string): string {
+  const tomorrow = academicDateKey(addDays(new Date(`${today}T12:00:00`), 1));
+  if (date === today) return "Hoy";
+  if (date === tomorrow) return "Mañana";
+  return format(parseISO(`${date}T12:00:00`), "d MMM", { locale: es });
+}
+
 export function ActivityBoard() {
   const { activeCourses, activeTasks, activeAssessments, activeDashboardItems } = useSemesterData();
-  const [range, setRange] = useState<Range>("week");
+  const [range, setRange] = useState<Range>("today");
+  const [selectedItem, setSelectedItem] = useState<DashboardItem | null>(null);
   const today = academicDateKey();
   const courseById = new Map(activeCourses.map((course) => [course.id, course]));
 
@@ -69,7 +78,7 @@ export function ActivityBoard() {
       result.push({
         id: `board-task-${task.id}`, courseId: task.courseId, title: task.title, kind: "assignment",
         date: task.dueDate, time: task.dueTime, description: task.description,
-        externalUrl: task.externalUrl ?? `/tasks?activity=${encodeURIComponent(task.id)}`,
+        externalUrl: task.externalUrl ?? null,
         externalId: task.externalId ?? task.id, source: "canvas", completed: task.status === "completed",
         newActivity: false, pointsPossible: task.pointsPossible ?? null,
       });
@@ -82,7 +91,7 @@ export function ActivityBoard() {
         id: `board-assessment-${assessment.id}`, courseId: assessment.courseId, title: assessment.name,
         kind: assessment.kind === "quiz" || assessment.kind === "exam" ? "quiz" : "assignment",
         date: assessment.date, time: assessment.time, description: assessment.description ?? "",
-        externalUrl: assessment.externalUrl ?? `/assessments?activity=${encodeURIComponent(assessment.id)}`,
+        externalUrl: assessment.externalUrl ?? null,
         externalId: assessment.externalId ?? assessment.id, source: "canvas", completed: assessment.status === "graded",
         newActivity: false, pointsPossible: assessment.pointsPossible ?? null,
       });
@@ -100,6 +109,18 @@ export function ActivityBoard() {
     for (const item of items) map.set(item.date, [...(map.get(item.date) ?? []), item]);
     return [...map.entries()];
   }, [items]);
+
+  const selectedActivity = useMemo<AcademicActivity | null>(() => {
+    if (!selectedItem) return null;
+    const sameOrigin = (activity: { id: string; courseId: string | null; externalId?: string }) =>
+      activity.courseId === selectedItem.courseId
+      && (activity.externalId ?? activity.id) === selectedItem.externalId;
+    return activeTasks.find(sameOrigin) ?? activeAssessments.find(sameOrigin) ?? null;
+  }, [selectedItem, activeTasks, activeAssessments]);
+
+  const selectedCourseName = selectedItem?.courseId
+    ? courseById.get(selectedItem.courseId)?.name
+    : undefined;
 
   return (
     <Card className="fade-up overflow-hidden">
@@ -131,7 +152,6 @@ export function ActivityBoard() {
                   const colors = courseColorClasses(course?.color ?? "slate");
                   const meta = KIND_META[item.kind];
                   const Icon = meta.icon;
-                  const isExternal = Boolean(item.externalUrl?.startsWith("http"));
                   const content = (
                     <>
                       <span className={cn("h-full w-1 shrink-0", colors.bar)} aria-hidden="true" />
@@ -148,25 +168,35 @@ export function ActivityBoard() {
                           {course?.name ?? "Agenda personal"}{item.description ? ` · ${item.description}` : ""}
                         </span>
                       </span>
-                      <span className="flex shrink-0 items-center gap-3 pl-2 text-xs text-text-faint">
+                      <span className="flex w-full shrink-0 items-center justify-between gap-3 pl-12 text-xs text-text-faint sm:w-auto sm:justify-end sm:pl-2">
                         {item.completed ? <CheckCircle2 size={15} className="text-present" aria-label="Completado" /> : null}
                         {item.pointsPossible != null ? <span>{item.pointsPossible} pts</span> : null}
-                        <span className="tabular">{item.time ?? "Todo el día"}</span>
-                        {isExternal ? <ExternalLink size={14} aria-hidden="true" /> : null}
+                        <span className={cn(
+                          "rounded-lg border px-2.5 py-1.5 text-right tabular",
+                          item.kind === "assignment" || item.kind === "quiz"
+                            ? "border-accent/25 bg-accent-soft/55 text-accent"
+                            : "border-border bg-surface-subtle text-text-muted",
+                        )}>
+                          <span className="block text-[9px] font-bold uppercase tracking-wider">
+                            {item.kind === "assignment" || item.kind === "quiz" ? "Entrega" : "Fecha"}
+                          </span>
+                          <span className="block text-xs font-semibold">
+                            {compactDateLabel(item.date, today)} · {item.time ?? "Todo el día"}
+                          </span>
+                        </span>
+                        {item.externalUrl ? <ExternalLink size={14} aria-hidden="true" /> : null}
                       </span>
                     </>
                   );
                   const className = cn(
-                    "flex min-h-[72px] items-stretch gap-3 pr-5 text-left transition-colors hover:bg-surface-subtle/70 sm:pr-6",
+                    "flex min-h-[80px] w-full flex-wrap items-center gap-3 pr-5 text-left transition-colors hover:bg-surface-subtle/70 sm:flex-nowrap sm:pr-6",
                     item.completed && "opacity-65",
                   );
                   return (
                     <li key={item.id}>
-                      {item.externalUrl ? isExternal ? (
-                        <a href={item.externalUrl} target="_blank" rel="noreferrer" className={className}>{content}</a>
-                      ) : (
-                        <Link href={item.externalUrl} className={className}>{content}</Link>
-                      ) : <div className={className}>{content}</div>}
+                      <button type="button" className={className} onClick={() => setSelectedItem(item)}>
+                        {content}
+                      </button>
                     </li>
                   );
                 })}
@@ -174,6 +204,19 @@ export function ActivityBoard() {
             </section>
           ))}
         </div>
+      )}
+      {selectedActivity ? (
+        <ActivityDetailsDialog
+          activity={selectedActivity}
+          courseName={selectedCourseName}
+          onClose={() => setSelectedItem(null)}
+        />
+      ) : (
+        <DashboardItemDetailsDialog
+          item={selectedItem}
+          courseName={selectedCourseName}
+          onClose={() => setSelectedItem(null)}
+        />
       )}
     </Card>
   );

@@ -132,12 +132,12 @@ export default function DashboardPage() {
 
       <WeekStrip />
       <PendingConfirmations />
-      <ActivityBoard />
 
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
           <NextClassCard />
           <AgendaToday />
+          <ActivityBoard />
         </div>
         <div className="space-y-5">
           <AttendanceMini />
