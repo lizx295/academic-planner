@@ -21,7 +21,14 @@ import { DayPreview } from "@/components/dashboard/DayPreview";
 import { ActivityBoard } from "@/components/dashboard/ActivityBoard";
 
 function WeekStrip() {
-  const { activeCourses, activeSchedules, semester } = useSemesterData();
+  const {
+    activeCourses,
+    activeSchedules,
+    activeTasks,
+    activeAssessments,
+    activeDashboardItems,
+    semester,
+  } = useSemesterData();
   const now = useNow(60_000);
   const today = academicDateKey(now);
   const academicToday = new Date(`${today}T12:00:00`);
@@ -40,6 +47,16 @@ function WeekStrip() {
           const dow = day.getDay();
           const sessions = activeSchedules.filter((s) => s.weekday === dow);
           const courseIds = new Set(sessions.map((s) => s.courseId));
+          for (const task of activeTasks) {
+            if (task.dueDate === key && task.courseId) courseIds.add(task.courseId);
+          }
+          for (const assessment of activeAssessments) {
+            if (assessment.date === key) courseIds.add(assessment.courseId);
+          }
+          for (const item of activeDashboardItems) {
+            if (item.date === key && item.courseId) courseIds.add(item.courseId);
+          }
+          const visibleCourseIds = [...courseIds].slice(0, 5);
           const isSelected = key === selectedDay;
           return (
             <button
@@ -73,14 +90,15 @@ function WeekStrip() {
                 {format(day, "d")}
               </span>
               <span className="flex min-h-[6px] items-center gap-0.5" aria-hidden="true">
-                {courseIds.size > 0
-                  ? [...courseIds].map((id) => (
+                {visibleCourseIds.map((id) => (
                       <span
                         key={id}
                         className={cn("h-1.5 w-1.5 rounded-full", courseColorClasses(colors.get(id) ?? "slate").dot)}
                       />
-                    ))
-                  : null}
+                    ))}
+                {courseIds.size > visibleCourseIds.length ? (
+                  <span className="ml-0.5 text-[8px] font-semibold leading-none text-text-faint">+{courseIds.size - visibleCourseIds.length}</span>
+                ) : null}
               </span>
             </button>
           );

@@ -7,6 +7,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ArrowLeft,
+  BellRing,
   BookOpen,
   CalendarClock,
   CheckCircle2,
@@ -49,11 +50,11 @@ import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
 import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { AssessmentFormDialog } from "@/components/assessments/AssessmentFormDialog";
-import { ActivityDetailsDialog, type AcademicActivity } from "@/components/activities/ActivityDetails";
 import { AttendanceRow } from "@/components/attendance/AttendanceRow";
 import { AttendanceCorrectionDialog } from "@/components/attendance/AttendanceCorrectionDialog";
 import { MaterialFormDialog } from "@/components/materials/MaterialFormDialog";
 import { WorkspaceDialog } from "@/components/notes/WorkspaceDialog";
+import { activityHref } from "@/lib/activity-detail";
 
 type Tab =
   | "resumen"
@@ -62,6 +63,7 @@ type Tab =
   | "tareas"
   | "evaluaciones"
   | "calificaciones"
+  | "anuncios"
   | "contenidos"
   | "materiales"
   | "workspace";
@@ -73,6 +75,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "tareas", label: "Tareas" },
   { id: "evaluaciones", label: "Evaluaciones" },
   { id: "calificaciones", label: "Calificaciones" },
+  { id: "anuncios", label: "Anuncios" },
   { id: "contenidos", label: "Módulos" },
   { id: "materiales", label: "Materiales" },
   { id: "workspace", label: "Workspace" },
@@ -103,6 +106,7 @@ export default function CourseDetailPage() {
   const materials = useAppStore((s) => s.materials);
   const modules = useAppStore((s) => s.modules);
   const moduleItems = useAppStore((s) => s.moduleItems);
+  const announcements = useAppStore((s) => s.announcements);
   const notionWorkspaces = useAppStore((s) => s.notionWorkspaces);
   const deleteCourse = useAppStore((s) => s.deleteCourse);
   const deleteTask = useAppStore((s) => s.deleteTask);
@@ -121,7 +125,6 @@ export default function CourseDetailPage() {
     open: boolean;
     assessment: Assessment | null;
   }>({ open: false, assessment: null });
-  const [detailsFor, setDetailsFor] = useState<AcademicActivity | null>(null);
   const [correcting, setCorrecting] = useState<AttendanceRecord | null>(null);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -163,6 +166,12 @@ export default function CourseDetailPage() {
   const courseMaterials = useMemo(
     () => materials.filter((m) => m.courseId === courseId).sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? "") || a.title.localeCompare(b.title)),
     [materials, courseId],
+  );
+  const courseAnnouncements = useMemo(
+    () => announcements
+      .filter((item) => item.courseId === courseId)
+      .sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
+    [announcements, courseId],
   );
   const courseModules = useMemo(
     () => modules.filter((item) => item.courseId === courseId).sort((a, b) => a.position - b.position),
@@ -380,10 +389,10 @@ export default function CourseDetailPage() {
                 }
               />
               {nextAssessment ? (
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-subtle px-3 py-2 text-sm">
+                <Link href={activityHref(nextAssessment.id)} className="mt-3 flex items-center justify-between rounded-xl bg-surface-subtle px-3 py-2 text-sm transition-colors hover:bg-accent-soft/50">
                   <span className="text-text-muted">Calificar antes del</span>
                   <span className="font-medium text-text">{nextAssessment.time ?? "Todo el día"}</span>
-                </div>
+                </Link>
               ) : null}
             </Card>
 
@@ -504,7 +513,7 @@ export default function CourseDetailPage() {
                     key={t.id}
                     task={t}
                     course={course}
-                    onOpen={() => setDetailsFor(t)}
+                    onOpen={() => router.push(activityHref(t.id))}
                     canEdit={t.source !== "canvas"}
                     onEdit={t.source === "canvas" ? undefined : () => setTaskForm({ open: true, task: t })}
                     onDelete={t.source === "canvas" ? undefined : () => deleteTask(t.id)}
@@ -545,7 +554,7 @@ export default function CourseDetailPage() {
                     assessment={a}
                     courseColor={course.color}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onOpen={() => setDetailsFor(a)}
+                    onOpen={() => router.push(activityHref(a.id))}
                     onEdit={a.source === "canvas" ? undefined : () => setAssessmentForm({ open: true, assessment: a })}
                     onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
@@ -639,7 +648,7 @@ export default function CourseDetailPage() {
                       key={a.id}
                       type="button"
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-subtle"
-                      onClick={() => setDetailsFor(a)}
+                      onClick={() => router.push(activityHref(a.id))}
                     >
                       <progress
                         value={score}
@@ -690,18 +699,13 @@ export default function CourseDetailPage() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
-                          <p className="truncate text-sm font-medium text-text">{m.title}</p>
+                          <Link href={activityHref(m.id)} className="truncate text-sm font-medium text-text hover:text-accent">{m.title}</Link>
                           {m.canvasType ? <Badge tone="neutral">{m.canvasType === "discussion" ? "Foro" : m.canvasType === "page" ? "Página" : m.canvasType === "file" ? "Archivo" : "Enlace"}</Badge> : null}
                         </div>
                         {m.description ? <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-text-muted">{m.description}</p> : null}
-                        <a
-                          href={m.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 block truncate text-xs text-text-faint hover:text-accent"
-                        >
-                          {m.url}
-                        </a>
+                        <Link href={activityHref(m.id)} className="mt-1 block text-xs font-medium text-accent hover:underline">
+                          Ver contenido y detalles
+                        </Link>
                       </div>
                       {m.source !== "canvas" ? <IconButton
                         aria-label="Eliminar material"
@@ -721,6 +725,38 @@ export default function CourseDetailPage() {
                 </div>
               </>
             )}
+          </Card>
+        ) : null}
+
+        {tab === "anuncios" ? (
+          <Card className="divide-y divide-border overflow-hidden">
+            {courseAnnouncements.length === 0 ? (
+              <EmptyState
+                icon={<BellRing size={22} aria-hidden="true" />}
+                title="Sin anuncios"
+                description="Los comunicados publicados por el docente aparecerán aquí después de sincronizar Canvas."
+              />
+            ) : courseAnnouncements.map((announcement) => (
+              <Link
+                key={announcement.id}
+                href={activityHref(announcement.id)}
+                className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-subtle"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">
+                  <BellRing size={16} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-text">{announcement.title}</span>
+                    {!announcement.read ? <Badge tone="accent">Nuevo</Badge> : null}
+                  </span>
+                  <span className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-muted">{announcement.message || "Sin descripción"}</span>
+                  <span className="mt-1.5 block text-[11px] text-text-faint">
+                    {announcement.authorName} · {format(parseISO(announcement.postedAt), "d MMM yyyy · HH:mm", { locale: es })}
+                  </span>
+                </span>
+              </Link>
+            ))}
           </Card>
         ) : null}
 
@@ -746,10 +782,10 @@ export default function CourseDetailPage() {
                         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.completed ? "bg-present-soft text-present" : "bg-surface-subtle text-text-faint"}`}>
                           {item.locked ? <Lock size={14} /> : item.completed ? <CircleCheck size={15} /> : <FileText size={14} />}
                         </span>
-                        <div className="min-w-0 flex-1">
+                        <Link href={activityHref(item.id)} className="min-w-0 flex-1 hover:text-accent">
                           <p className="truncate text-sm font-medium text-text">{item.title}</p>
                           <p className="text-xs text-text-faint">{item.kind}{item.required ? " · requerido" : ""}</p>
-                        </div>
+                        </Link>
                         {item.externalUrl && !item.locked ? <a href={item.externalUrl} target="_blank" rel="noreferrer" className="text-text-faint hover:text-accent" aria-label={`Abrir ${item.title} en Canvas`}><ExternalLink size={15} /></a> : null}
                       </li>
                     ))}
@@ -784,11 +820,6 @@ export default function CourseDetailPage() {
         courses={courses}
         assessment={assessmentForm.assessment}
         defaultCourseId={course.id}
-      />
-      <ActivityDetailsDialog
-        activity={detailsFor}
-        courseName={course.name}
-        onClose={() => setDetailsFor(null)}
       />
       <AttendanceCorrectionDialog
         record={correcting}

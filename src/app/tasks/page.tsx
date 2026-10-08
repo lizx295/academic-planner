@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { addDays } from "date-fns";
 import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, Plus, Sparkles } from "lucide-react";
 
@@ -17,7 +18,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Input } from "@/components/ui/Field";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog";
-import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
+import { activityHref } from "@/lib/activity-detail";
 
 type Filter = "all" | "pending" | "in_progress" | "completed";
 type PeriodFilter = "all" | "today" | "week" | "month" | "date";
@@ -49,7 +50,7 @@ export default function TasksPage() {
     open: false,
     task: null,
   });
-  const [detailsFor, setDetailsFor] = useState<Task | null>(null);
+  const router = useRouter();
 
   const now = useNow(60_000);
   const todayISO = toISODate(now);
@@ -183,7 +184,7 @@ export default function TasksPage() {
                       key={t.id}
                       task={t}
                       course={courseById.get(t.courseId ?? "")}
-                      onOpen={() => setDetailsFor(t)}
+                      onOpen={() => router.push(activityHref(t.id))}
                       canEdit={t.source !== "canvas"}
                       onEdit={t.source === "canvas" ? undefined : () => setForm({ open: true, task: t })}
                       onDelete={t.source === "canvas" ? undefined : () => deleteTask(t.id)}
@@ -200,11 +201,6 @@ export default function TasksPage() {
         onClose={() => setForm({ open: false, task: null })}
         courses={activeCourses}
         task={form.task}
-      />
-      <ActivityDetailsDialog
-        activity={detailsFor}
-        courseName={detailsFor?.courseId ? courseById.get(detailsFor.courseId)?.name : undefined}
-        onClose={() => setDetailsFor(null)}
       />
     </div>
   );

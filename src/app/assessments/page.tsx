@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarRange, Plus, School } from "lucide-react";
@@ -16,7 +17,7 @@ import { Progress } from "@/components/ui/Progress";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { AssessmentFormDialog } from "@/components/assessments/AssessmentFormDialog";
-import { ActivityDetailsDialog } from "@/components/activities/ActivityDetails";
+import { activityHref } from "@/lib/activity-detail";
 
 export default function AssessmentsPage() {
   const { activeAssessments, activeCourses, courses, grades } = useSemesterData();
@@ -26,7 +27,7 @@ export default function AssessmentsPage() {
     open: false,
     assessment: null,
   });
-  const [detailsFor, setDetailsFor] = useState<Assessment | null>(null);
+  const router = useRouter();
 
   const withCourse = useMemo(
     () => attachCourseName(activeAssessments, courses),
@@ -152,7 +153,7 @@ export default function AssessmentsPage() {
                     assessment={a}
                     courseColor={a.courseColor}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onOpen={() => setDetailsFor(a)}
+                    onOpen={() => router.push(activityHref(a.id))}
                     onEdit={a.source === "canvas" ? undefined : () => setForm({ open: true, assessment: a })}
                     onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
@@ -192,7 +193,7 @@ export default function AssessmentsPage() {
                     assessment={a}
                     courseColor={a.courseColor}
                     gradeScore={grades.find((g) => g.assessmentId === a.id)?.score}
-                    onOpen={() => setDetailsFor(a)}
+                    onOpen={() => router.push(activityHref(a.id))}
                     onEdit={a.source === "canvas" ? undefined : () => setForm({ open: true, assessment: a })}
                     onDelete={a.source === "canvas" ? undefined : () => deleteAssessment(a.id)}
                   />
@@ -208,11 +209,6 @@ export default function AssessmentsPage() {
         onClose={() => setForm({ open: false, assessment: null })}
         courses={activeCourses}
         assessment={form.assessment}
-      />
-      <ActivityDetailsDialog
-        activity={detailsFor}
-        courseName={detailsFor ? courses.find((course) => course.id === detailsFor.courseId)?.name : undefined}
-        onClose={() => setDetailsFor(null)}
       />
     </div>
   );
