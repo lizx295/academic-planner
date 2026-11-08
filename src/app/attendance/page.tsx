@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarClock, Check, ChevronRight, UserCheck, X } from "lucide-react";
+import { CalendarClock, CalendarX2, Check, ChevronRight, UserCheck, X } from "lucide-react";
 
 import { useSemesterData } from "@/hooks/useSemesterData";
 import { useAppStore } from "@/store/app";
@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AttendanceRow } from "@/components/attendance/AttendanceRow";
 import { AttendanceCorrectionDialog } from "@/components/attendance/AttendanceCorrectionDialog";
+import { ManualAttendanceDialog } from "@/components/attendance/ManualAttendanceDialog";
 
 export default function AttendancePage() {
   const {
@@ -39,6 +40,7 @@ export default function AttendancePage() {
   );
   const respondAttendance = useAppStore((s) => s.respondAttendance);
   const [correcting, setCorrecting] = useState<AttendanceRecord | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const stats = useMemo(() => attendanceStats(activeAttendance), [activeAttendance]);
   const pending = useMemo(
@@ -73,6 +75,11 @@ export default function AttendancePage() {
           stats.total > 0
             ? `${stats.present} presentes · ${stats.absent} ausentes · ${stats.excused} justificadas`
             : "Registra tu asistencia para ver estadísticas"
+        }
+        action={
+          <Button variant="secondary" size="sm" onClick={() => setManualOpen(true)}>
+            <CalendarX2 size={14} aria-hidden="true" /> Registrar falta
+          </Button>
         }
       />
 
@@ -213,6 +220,7 @@ export default function AttendancePage() {
       </Card>
 
       <AttendanceCorrectionDialog record={correcting} onClose={() => setCorrecting(null)} />
+      <ManualAttendanceDialog open={manualOpen} onClose={() => setManualOpen(false)} />
     </div>
   );
 }

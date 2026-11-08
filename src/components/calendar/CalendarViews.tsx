@@ -262,7 +262,7 @@ export function TimeGrid({
               const isToday = key === format(new Date(), "yyyy-MM-dd");
               const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
               const nowPct = ((nowMin - DAY_START) / TOTAL_MIN) * 100;
-              const placed = placeEvents(events).filter(
+              const placed = placeEvents(events.filter((e) => !e.allDay)).filter(
                 (e) => timeToMinutes(e.end) > DAY_START && timeToMinutes(e.start) < DAY_END,
               );
 
@@ -387,8 +387,12 @@ export function MobileAgenda({
                         className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left", meta.softColor)}
                       >
                         <span className="flex w-12 shrink-0 flex-col items-end leading-tight tabular">
-                          <span className="text-[13px] font-semibold text-text">{ev.start}</span>
-                          <span className="text-[10px] text-text-faint">{ev.end}</span>
+                          <span className="text-[13px] font-semibold text-text">
+                            {ev.allDay ? "Todo" : ev.start}
+                          </span>
+                          <span className="text-[10px] text-text-faint">
+                            {ev.allDay ? "el día" : ev.end}
+                          </span>
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className={cn("block truncate text-sm font-medium text-text")}>{ev.title}</span>
@@ -420,6 +424,7 @@ export function Legend() {
     { key: "project", label: "Proyecto" },
     { key: "delivery", label: "Entrega" },
     { key: "personal", label: "Personal" },
+    { key: "holiday", label: "Feriado / sin clases" },
   ];
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5" role="list" aria-label="Tipos de evento">

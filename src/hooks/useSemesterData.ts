@@ -12,6 +12,8 @@ import { useAppStore } from "@/store/app";
 export function useSemesterData() {
   const activeSemesterId = useAppStore((s) => s.activeSemesterId);
   const profile = useAppStore((s) => s.profile);
+  const semesters = useAppStore((s) => s.semesters);
+  const semesterDays = useAppStore((s) => s.semesterDays);
   const professors = useAppStore((s) => s.professors);
   const classrooms = useAppStore((s) => s.classrooms);
   const courses = useAppStore((s) => s.courses);
@@ -25,8 +27,13 @@ export function useSemesterData() {
   const personalEvents = useAppStore((s) => s.personalEvents);
 
   const semester = useMemo(
-    () => useAppStore.getState().semesters.find((s) => s.id === activeSemesterId),
-    [activeSemesterId],
+    () => semesters.find((s) => s.id === activeSemesterId),
+    [semesters, activeSemesterId],
+  );
+
+  const activeSemesterDays = useMemo(
+    () => semesterDays.filter((d) => d.semesterId === activeSemesterId),
+    [semesterDays, activeSemesterId],
   );
 
   const activeCourses = useMemo(
@@ -69,6 +76,9 @@ export function useSemesterData() {
   return {
     activeSemesterId,
     semester,
+    semesters,
+    semesterDays,
+    activeSemesterDays,
     profile,
     professors,
     classrooms,

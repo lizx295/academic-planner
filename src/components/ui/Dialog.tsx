@@ -82,7 +82,7 @@ export function Dialog({ open, onClose, title, description, size = "md", childre
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "relative z-10 max-h-[92dvh] w-full overflow-y-auto scale-in rounded-t-2xl border border-border bg-surface p-5 shadow-xl shadow-black/10 outline-none sm:rounded-2xl",
+          "relative z-10 max-h-[92dvh] w-full overflow-y-auto scale-in rounded-t-2xl glass-strong p-5 shadow-xl shadow-black/10 outline-none sm:rounded-2xl",
           size === "sm" && "sm:max-w-md",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-2xl",

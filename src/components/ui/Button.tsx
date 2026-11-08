@@ -12,7 +12,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-on-accent hover:bg-accent-strong shadow-xs",
+  primary: "brand-gradient shadow-lg shadow-accent/20 hover:brightness-[1.04]",
   secondary: "bg-surface text-text border border-border hover:bg-surface-subtle",
   ghost: "text-text-muted hover:text-text hover:bg-surface-subtle",
   subtle: "bg-accent-soft text-accent hover:brightness-105",

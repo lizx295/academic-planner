@@ -29,6 +29,33 @@ export const metadata: Metadata = {
     "Centro académico personal: materias, horarios, asistencia, tareas, evaluaciones, calendario y workspace.",
   applicationName: "Academic Planner",
   generator: "Next.js",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/icons/favicon-32.png"],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Academic Planner",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
+  openGraph: {
+    type: "website",
+    title: "Academic Planner · ESPOL",
+    description:
+      "Materias, horarios, faltas, tareas, notas y Aula Virtual ESPOL sincronizados entre tu laptop y tu teléfono.",
+    siteName: "Academic Planner",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {

@@ -9,96 +9,117 @@
 
 :root {
   /* Superficies y fondo */
-  --bg: #f6f6f8;
-  --surface: #ffffff;
-  --surface-subtle: #f1f2f5;
-  --surface-raised: #ffffff;
-  --overlay: rgba(18, 19, 24, 0.42);
+  --bg: #fdf7f9;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-solid: #ffffff;
+  --surface-subtle: rgba(255, 244, 248, 0.72);
+  --surface-raised: rgba(255, 255, 255, 0.9);
+  --overlay: rgba(60, 36, 48, 0.32);
+
+  /* Vidrio (liquid glass) */
+  --glass: rgba(255, 255, 255, 0.56);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.66);
+  --shadow-color: rgba(122, 52, 79, 0.14);
 
   /* Bordes */
-  --border: #e7e8ee;
-  --border-strong: #d8dae2;
+  --border: rgba(217, 168, 186, 0.32);
+  --border-strong: rgba(199, 141, 163, 0.5);
 
   /* Texto */
-  --text: #191a21;
-  --text-muted: #55575f;
-  --text-faint: #898c96;
+  --text: #32222b;
+  --text-muted: #6f5661;
+  --text-faint: #9d8791;
 
-  /* Marca */
-  --accent: #4f43e8;
-  --accent-strong: #3d34c5;
-  --accent-soft: #efedfd;
+  /* Marca: rosa pastel + verde menta */
+  --accent: #cf4a77;
+  --accent-strong: #ad3560;
+  --accent-soft: rgba(255, 170, 198, 0.24);
   --on-accent: #ffffff;
+  --accent-2: #2f9e7c;
+  --accent-2-soft: rgba(111, 224, 189, 0.22);
 
-  --ring: #4f43e8;
+  --ring: #cf4a77;
 
   /* Tipos de evento (calendario) — base y tinte */
-  --class: #5353d8;
-  --class-soft: rgba(83, 83, 216, 0.12);
-  --task: #b45309;
-  --task-soft: rgba(180, 83, 9, 0.12);
-  --exam: #be2742;
-  --exam-soft: rgba(190, 39, 66, 0.11);
-  --project: #7c3aed;
-  --project-soft: rgba(124, 58, 237, 0.11);
-  --delivery: #0f766e;
-  --delivery-soft: rgba(15, 118, 110, 0.11);
-  --personal: #475569;
-  --personal-soft: rgba(71, 85, 105, 0.12);
+  --class: #2f8f79;
+  --class-soft: rgba(47, 143, 121, 0.14);
+  --task: #b7791f;
+  --task-soft: rgba(183, 121, 31, 0.14);
+  --exam: #cf3f63;
+  --exam-soft: rgba(207, 63, 99, 0.13);
+  --project: #8257d6;
+  --project-soft: rgba(130, 87, 214, 0.13);
+  --delivery: #2f9e7c;
+  --delivery-soft: rgba(47, 158, 124, 0.13);
+  --personal: #6b7280;
+  --personal-soft: rgba(107, 114, 128, 0.12);
+  --holiday: #b45309;
+  --holiday-soft: rgba(180, 83, 9, 0.12);
 
   /* Estados de asistencia */
-  --present: #15803d;
-  --present-soft: rgba(21, 128, 61, 0.12);
-  --absent: #be2742;
-  --absent-soft: rgba(190, 39, 66, 0.11);
-  --pending: #b45309;
-  --pending-soft: rgba(180, 83, 9, 0.12);
-  --excused: #0f766e;
-  --excused-soft: rgba(15, 118, 110, 0.11);
+  --present: #2f8f5b;
+  --present-soft: rgba(47, 143, 91, 0.14);
+  --absent: #cf3f63;
+  --absent-soft: rgba(207, 63, 99, 0.13);
+  --pending: #b7791f;
+  --pending-soft: rgba(183, 121, 31, 0.14);
+  --excused: #2f8f79;
+  --excused-soft: rgba(47, 143, 121, 0.13);
 }
 
 .dark {
-  --bg: #0b0c11;
-  --surface: #12141b;
-  --surface-subtle: #171922;
-  --surface-raised: #1b1e28;
-  --overlay: rgba(0, 0, 0, 0.6);
+  --bg: #141016;
+  --surface: rgba(38, 29, 38, 0.64);
+  --surface-solid: #1c1620;
+  --surface-subtle: rgba(255, 255, 255, 0.05);
+  --surface-raised: rgba(255, 255, 255, 0.08);
+  --overlay: rgba(0, 0, 0, 0.62);
 
-  --border: #232630;
-  --border-strong: #30343f;
+  --glass: rgba(34, 26, 34, 0.55);
+  --glass-strong: rgba(44, 33, 44, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --shadow-color: rgba(0, 0, 0, 0.5);
 
-  --text: #eceef2;
-  --text-muted: #a3a7b2;
-  --text-faint: #6d7180;
+  --border: rgba(255, 190, 214, 0.14);
+  --border-strong: rgba(255, 190, 214, 0.26);
 
-  --accent: #8b86f0;
-  --accent-strong: #a6a2f4;
-  --accent-soft: rgba(139, 134, 240, 0.16);
-  --on-accent: #ffffff;
+  --text: #f6ecf1;
+  --text-muted: #c4adb8;
+  --text-faint: #93808a;
 
-  --ring: #8b86f0;
+  --accent: #f78bab;
+  --accent-strong: #fba9c1;
+  --accent-soft: rgba(247, 139, 171, 0.16);
+  --on-accent: #241019;
+  --accent-2: #6fe0bd;
+  --accent-2-soft: rgba(111, 224, 189, 0.16);
 
-  --class: #9d9df5;
-  --class-soft: rgba(157, 157, 245, 0.16);
-  --task: #e6a35e;
-  --task-soft: rgba(230, 163, 94, 0.16);
-  --exam: #f08396;
-  --exam-soft: rgba(240, 131, 150, 0.15);
-  --project: #c4a6f7;
-  --project-soft: rgba(196, 166, 247, 0.15);
-  --delivery: #66cabb;
-  --delivery-soft: rgba(102, 202, 187, 0.15);
-  --personal: #9aa4b8;
-  --personal-soft: rgba(154, 164, 184, 0.15);
+  --ring: #f78bab;
 
-  --present: #4ade80;
-  --present-soft: rgba(74, 222, 128, 0.14);
-  --absent: #f08396;
-  --absent-soft: rgba(240, 131, 150, 0.15);
-  --pending: #e6a35e;
-  --pending-soft: rgba(230, 163, 94, 0.16);
-  --excused: #66cabb;
-  --excused-soft: rgba(102, 202, 187, 0.15);
+  --class: #7fe0c4;
+  --class-soft: rgba(127, 224, 196, 0.16);
+  --task: #f2c078;
+  --task-soft: rgba(242, 192, 120, 0.16);
+  --exam: #ff9db3;
+  --exam-soft: rgba(255, 157, 179, 0.15);
+  --project: #cbb0ff;
+  --project-soft: rgba(203, 176, 255, 0.15);
+  --delivery: #8fe8c9;
+  --delivery-soft: rgba(143, 232, 201, 0.15);
+  --personal: #b3b9c9;
+  --personal-soft: rgba(179, 185, 201, 0.15);
+  --holiday: #f2b47a;
+  --holiday-soft: rgba(242, 180, 122, 0.15);
+
+  --present: #7fe0a8;
+  --present-soft: rgba(127, 224, 168, 0.14);
+  --absent: #ff9db3;
+  --absent-soft: rgba(255, 157, 179, 0.15);
+  --pending: #f2c078;
+  --pending-soft: rgba(242, 192, 120, 0.16);
+  --excused: #8fe8c9;
+  --excused-soft: rgba(143, 232, 201, 0.15);
 }
 
 @theme inline {
@@ -119,6 +140,10 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-soft: var(--accent-2-soft);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
 
   --color-class: var(--class);
   --color-class-soft: var(--class-soft);
@@ -132,6 +157,8 @@
   --color-delivery-soft: var(--delivery-soft);
   --color-personal: var(--personal);
   --color-personal-soft: var(--personal-soft);
+  --color-holiday: var(--holiday);
+  --color-holiday-soft: var(--holiday-soft);
 
   --color-present: var(--present);
   --color-present-soft: var(--present-soft);
@@ -162,11 +189,25 @@
 
   body {
     background-color: var(--bg);
+    background-image:
+      radial-gradient(900px 520px at 10% -10%, rgba(255, 174, 200, 0.55), transparent 62%),
+      radial-gradient(820px 480px at 94% 2%, rgba(150, 232, 204, 0.5), transparent 58%),
+      radial-gradient(700px 520px at 50% 110%, rgba(255, 205, 220, 0.32), transparent 65%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: var(--text);
     font-family: var(--font-sans), system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(900px 520px at 10% -10%, rgba(120, 48, 80, 0.42), transparent 62%),
+      radial-gradient(820px 480px at 94% 2%, rgba(28, 104, 84, 0.38), transparent 58%),
+      radial-gradient(700px 520px at 50% 110%, rgba(80, 32, 56, 0.28), transparent 65%);
   }
 
   ::selection {
@@ -218,9 +259,49 @@
    --------------------------------------------------------------- */
 
 @utility surface-card {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background-color: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.5) inset,
+    0 18px 40px -24px var(--shadow-color);
+}
+
+@utility glass {
+  background-color: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.45) inset,
+    0 20px 50px -30px var(--shadow-color);
+}
+
+@utility glass-strong {
+  background-color: var(--glass-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.55) inset,
+    0 24px 60px -32px var(--shadow-color);
+}
+
+/* Degradado de marca rosa → menta, para botones y acentos */
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, var(--accent) 0%, #e56f96 48%, var(--accent-2) 130%);
+  color: var(--on-accent);
+}
+
+@utility brand-soft {
+  background-image: linear-gradient(
+    135deg,
+    var(--accent-soft) 0%,
+    rgba(255, 255, 255, 0.4) 55%,
+    var(--accent-2-soft) 100%
+  );
 }
 
 @utility text-balance {

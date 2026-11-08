@@ -127,4 +127,11 @@ export const EVENT_META: Record<
     softColor: "bg-personal-soft",
     barColor: "bg-personal",
   },
+  holiday: {
+    label: "Feriado / sin clases",
+    dotColor: "bg-holiday",
+    textColor: "text-holiday",
+    softColor: "bg-holiday-soft",
+    barColor: "bg-holiday",
+  },
 };

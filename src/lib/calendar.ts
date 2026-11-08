@@ -13,6 +13,7 @@ import type {
   Course,
   CourseSchedule,
   PersonalEvent,
+  SemesterDay,
   Task,
   Weekday,
   EventKind,
@@ -70,6 +71,7 @@ export interface EventSource {
   tasks: Task[];
   assessments: Assessment[];
   personalEvents: PersonalEvent[];
+  semesterDays?: SemesterDay[];
 }
 
 const ASSESSMENT_KIND: Record<Assessment["kind"], EventKind> = {
@@ -85,11 +87,19 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
   const events: CalendarEvent[] = [];
   const courseById = new Map(src.courses.map((c) => [c.id, c]));
 
+  // Días sin clases (feriados/suspensiones): no se generan sesiones.
+  const blocked = new Set(
+    (src.semesterDays ?? [])
+      .filter((d) => d.kind === "holiday" || d.kind === "no_class")
+      .map((d) => d.date),
+  );
+
   // Clases según horario
   for (const sched of src.schedules) {
     const course = courseById.get(sched.courseId);
     if (!course) continue;
     for (const date of sessionsBetween(sched.weekday, from, to)) {
+      if (blocked.has(iso(date))) continue;
       events.push({
         id: `class-${sched.id}-${iso(date)}`,
         kind: "class",
@@ -156,6 +166,30 @@ export function materializeEvents(from: Date, to: Date, src: EventSource): Calen
     });
   }
 
+  // Días especiales del semestre (feriados, suspensiones, exámenes)
+  for (const day of src.semesterDays ?? []) {
+    if (day.date < iso(from) || day.date > iso(to)) continue;
+    const labelPrefix =
+      day.kind === "holiday"
+        ? "Feriado"
+        : day.kind === "no_class"
+          ? "Sin clases"
+          : day.kind === "exam_period"
+            ? "Exámenes"
+            : "Especial";
+    events.push({
+      id: `sd-${day.id}`,
+      kind: "holiday",
+      title: `${labelPrefix}: ${day.label}`,
+      date: day.date,
+      start: "00:00",
+      end: "23:59",
+      allDay: true,
+      color: "holiday",
+      refId: day.id,
+    });
+  }
+
   return events.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
 }
 
@@ -166,4 +200,5 @@ const EVENT_COLOR: Record<EventKind, string> = {
   project: "project",
   delivery: "delivery",
   personal: "personal",
+  holiday: "holiday",
 };

@@ -5,15 +5,24 @@ import {
   Bell,
   CalendarCheck,
   CalendarClock,
+  Check,
+  CloudOff,
   Info,
+  LogOut,
   Moon,
+  RefreshCw,
+  ShieldCheck,
   SquareCheck,
   Sun,
   UserCheck,
+  UserRound,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useSession } from "@/components/auth/session";
 import { Logo } from "@/components/layout/Logo";
+import { Avatar } from "@/components/ui/Avatar";
 import { IconButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { applyThemeClass, useTheme } from "@/hooks/useTheme";
@@ -21,6 +30,7 @@ import { fmtRelativeIn } from "@/lib/format";
 import { pageTitleFor } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app";
+import { useCloudStore } from "@/store/cloud";
 import type { NotificationKind } from "@/types";
 
 const NOTIFICATION_ICON: Record<NotificationKind, typeof Bell> = {
@@ -160,6 +170,143 @@ function ThemeToggle() {
   );
 }
 
+function SyncBadge() {
+  const status = useCloudStore((s) => s.status);
+  const lastSyncAt = useCloudStore((s) => s.lastSyncAt);
+  const error = useCloudStore((s) => s.error);
+
+  const label =
+    status === "syncing"
+      ? "Sincronizando…"
+      : status === "synced"
+        ? lastSyncAt
+          ? "Sincronizado"
+          : "En la nube"
+        : status === "offline"
+          ? "Sin conexión"
+          : status === "error"
+            ? "Error de sync"
+            : "Conectando…";
+
+  const Icon =
+    status === "syncing"
+      ? RefreshCw
+      : status === "synced"
+        ? Check
+        : status === "idle"
+          ? RefreshCw
+          : CloudOff;
+
+  return (
+    <span
+      title={error ?? label}
+      className={cn(
+        "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium sm:flex",
+        status === "synced" && "border-border bg-accent-2-soft text-accent-2",
+        status === "syncing" && "border-border bg-surface-subtle text-text-muted",
+        status === "error" && "border-border bg-absent-soft text-absent",
+        (status === "offline" || status === "idle") && "border-border bg-surface-subtle text-text-faint",
+      )}
+    >
+      <Icon
+        size={12}
+        aria-hidden="true"
+        className={status === "syncing" || status === "idle" ? "animate-spin" : undefined}
+      />
+      {label}
+    </span>
+  );
+}
+
+function UserMenu() {
+  const { user, logout } = useSession();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-2 rounded-full p-0.5 transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <Avatar name={user.name || user.email} color="rose" />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-2xl glass-strong p-1.5 shadow-xl shadow-black/10"
+        >
+          <div className="px-3 py-2.5">
+            <p className="truncate text-sm font-semibold text-text">{user.name || "Estudiante"}</p>
+            <p className="truncate text-xs text-text-muted">{user.email}</p>
+            {user.role === "admin" ? (
+              <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                <ShieldCheck size={12} aria-hidden="true" /> Administrador
+              </p>
+            ) : null}
+          </div>
+          <div className="my-1 h-px bg-border" />
+          <Link
+            href="/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-text-muted hover:bg-surface-subtle hover:text-text"
+          >
+            <UserRound size={15} aria-hidden="true" /> Mi perfil y ajustes
+          </Link>
+          <Link
+            href="/connect"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-text-muted hover:bg-surface-subtle hover:text-text"
+          >
+            <RefreshCw size={15} aria-hidden="true" /> Dispositivos y sync
+          </Link>
+          {user.role === "admin" ? (
+            <Link
+              href="/admin"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-text-muted hover:bg-surface-subtle hover:text-text"
+            >
+              <ShieldCheck size={15} aria-hidden="true" /> Administración
+            </Link>
+          ) : null}
+          <div className="my-1 h-px bg-border" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void logout()}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-absent hover:bg-absent-soft"
+          >
+            <LogOut size={15} aria-hidden="true" /> Cerrar sesión
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Topbar() {
   const pathname = usePathname();
   const semesters = useAppStore((s) => s.semesters);
@@ -167,7 +314,7 @@ export function Topbar() {
   const setActiveSemester = useAppStore((s) => s.setActiveSemester);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border glass">
       <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         {/* Marca en móvil (en desktop el título lo proporciona el sidebar) */}
         <div className="flex min-w-0 items-center gap-2 lg:hidden">
@@ -183,6 +330,7 @@ export function Topbar() {
         </p>
 
         <div className="flex items-center gap-1.5">
+          <SyncBadge />
           <label className="hidden items-center gap-2 sm:flex">
             <span className="sr-only">Semestre activo</span>
             <select
@@ -199,6 +347,7 @@ export function Topbar() {
           </label>
           <ThemeToggle />
           <NotificationBell />
+          <UserMenu />
         </div>
       </div>
     </header>

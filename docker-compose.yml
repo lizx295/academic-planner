@@ -1,3 +1,12 @@
+# Entorno local completo: PostgreSQL + la app Next.js (PWA).
+#
+# Uso:
+#   docker compose up --build
+#   open http://localhost:3000
+#
+# Las claves de abajo son solo para desarrollo. En producción (Vercel +
+# Supabase) define valores propios en las variables de entorno del proyecto.
+
 name: academic-planner
 
 services:
@@ -18,29 +27,36 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
-    build: ./backend
-    restart: unless-stopped
-    environment:
-      TZ: America/Guayaquil
-      AP_ENVIRONMENT: development
-      AP_DATABASE_URL: postgresql+psycopg://planner:planner@db:5432/academic_planner
-      AP_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      NODE_ENV: production
       TZ: America/Guayaquil
+      DATABASE_URL: postgres://planner:planner@db:5432/academic_planner
+      DATABASE_SSL: disable
+      AUTH_SECRET: ${AUTH_SECRET:-dev-cambia-esta-clave-larga-academic-planner}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-dev-cambia-esta-clave-de-cifrado-32bytes}
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-espol.edu.ec}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@espol.edu.ec}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminEspol2026!}
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@espol.edu.ec}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo-2026}
+      SEED_DEMO: ${SEED_DEMO:-true}
+      AULAVIRTUAL_BASE_URL: ${AULAVIRTUAL_BASE_URL:-https://aulavirtual.espol.edu.ec}
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret}
+      # Web Push: si no se definen, el servidor genera claves efímeras.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:soporte@espol.edu.ec}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

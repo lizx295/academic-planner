@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { addDays, addMonths, addWeeks, format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Legend, MobileAgenda, MonthView, TimeGrid } from "@/components/calendar/CalendarViews";
 import { EventDialog } from "@/components/calendar/EventDialog";
-import { IconButton } from "@/components/ui/Button";
+import { SemesterDaysDialog } from "@/components/calendar/SemesterDaysDialog";
+import { Button, IconButton } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Segmented } from "@/components/ui/Segmented";
 import { useSemesterData } from "@/hooks/useSemesterData";
@@ -24,16 +25,19 @@ const VIEW_OPTIONS: Array<{ value: ViewMode; label: string }> = [
 
 export default function CalendarPage() {
   const {
+    activeSemesterId,
     activeCourses,
     activeSchedules,
     activeTasks,
     activeAssessments,
+    activeSemesterDays,
     personalEvents,
   } = useSemesterData();
 
   const [view, setView] = useState<ViewMode>("month");
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
+  const [specialOpen, setSpecialOpen] = useState(false);
 
   const source = useMemo(
     () => ({
@@ -42,8 +46,16 @@ export default function CalendarPage() {
       tasks: activeTasks,
       assessments: activeAssessments,
       personalEvents,
+      semesterDays: activeSemesterDays,
     }),
-    [activeCourses, activeSchedules, activeTasks, activeAssessments, personalEvents],
+    [
+      activeCourses,
+      activeSchedules,
+      activeTasks,
+      activeAssessments,
+      personalEvents,
+      activeSemesterDays,
+    ],
   );
 
   const periodLabel = useMemo(() => {
@@ -77,20 +89,25 @@ export default function CalendarPage() {
         title="Calendario"
         subtitle="Clases, tareas, exámenes y eventos personales."
         action={
-          <div className="flex items-center gap-2">
-            <IconButton onClick={goPrev} aria-label="Anterior">
-              <ChevronLeft size={18} aria-hidden="true" />
-            </IconButton>
-            <button
-              type="button"
-              onClick={goToday}
-              className="h-8 rounded-[10px] border border-border bg-surface px-3 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-subtle hover:text-text"
-            >
-              Hoy
-            </button>
-            <IconButton onClick={goNext} aria-label="Siguiente">
-              <ChevronRight size={18} aria-hidden="true" />
-            </IconButton>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setSpecialOpen(true)}>
+              <CalendarOff size={14} aria-hidden="true" /> Días especiales
+            </Button>
+            <div className="flex items-center gap-2">
+              <IconButton onClick={goPrev} aria-label="Anterior">
+                <ChevronLeft size={18} aria-hidden="true" />
+              </IconButton>
+              <button
+                type="button"
+                onClick={goToday}
+                className="h-8 rounded-[10px] border border-border bg-surface px-3 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-subtle hover:text-text"
+              >
+                Hoy
+              </button>
+              <IconButton onClick={goNext} aria-label="Siguiente">
+                <ChevronRight size={18} aria-hidden="true" />
+              </IconButton>
+            </div>
           </div>
         }
       />
@@ -120,6 +137,12 @@ export default function CalendarPage() {
       ) : null}
 
       <EventDialog event={selected} courseName={courseName} onClose={() => setSelected(null)} />
+
+      <SemesterDaysDialog
+        open={specialOpen}
+        onClose={() => setSpecialOpen(false)}
+        semesterId={activeSemesterId}
+      />
     </div>
   );
 }

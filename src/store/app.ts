@@ -15,12 +15,16 @@ import type {
   Grade,
   Material,
   MaterialKind,
+  Note,
+  NoteKind,
   NotionWorkspace,
   PersonalEvent,
   Profile,
   Professor,
   Classroom,
   Semester,
+  SemesterDay,
+  SemesterDayKind,
   Task,
   TaskPriority,
   TaskStatus,
@@ -46,6 +50,7 @@ interface AppStore {
   profile: Profile;
   activeSemesterId: string;
   semesters: Semester[];
+  semesterDays: SemesterDay[];
   professors: Professor[];
   classrooms: Classroom[];
   courses: Course[];
@@ -58,6 +63,7 @@ interface AppStore {
   notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
+  notes: Note[];
   theme: ThemePreference;
 
   // --- preferencias ---
@@ -101,6 +107,13 @@ interface AppStore {
   // --- asistencia ---
   respondAttendance: (id: string, status: "present" | "absent") => void;
   correctAttendance: (id: string, status: AttendanceStatus) => void;
+  recordAttendance: (input: {
+    courseId: string;
+    scheduleId: string;
+    date: string;
+    status: AttendanceStatus;
+    note?: string;
+  }) => void;
 
   // --- materiales ---
   addMaterial: (m: Omit<Material, "id">) => void;
@@ -109,6 +122,16 @@ interface AppStore {
   // --- eventos personales ---
   addPersonalEvent: (e: Omit<PersonalEvent, "id">) => void;
   deletePersonalEvent: (id: string) => void;
+
+  // --- días especiales del semestre ---
+  addSemesterDay: (d: Omit<SemesterDay, "id">) => string;
+  updateSemesterDay: (id: string, patch: Partial<Omit<SemesterDay, "id">>) => void;
+  deleteSemesterDay: (id: string) => void;
+
+  // --- notas y capturas rápidas ---
+  addNote: (n: Omit<Note, "id" | "createdAt" | "updatedAt">) => string;
+  updateNote: (id: string, patch: Partial<Note>) => void;
+  deleteNote: (id: string) => void;
 
   // --- notificaciones ---
   markNotificationRead: (id: string) => void;
@@ -339,6 +362,38 @@ setTheme: (theme) => set({ theme }),
           ),
         })),
 
+      recordAttendance: ({ courseId, scheduleId, date, status, note }) =>
+        set((s) => {
+          const existing = s.attendance.find(
+            (a) => a.courseId === courseId && a.scheduleId === scheduleId && a.date === date,
+          );
+          const responseTime = new Date().toISOString();
+          if (existing) {
+            return {
+              attendance: s.attendance.map((a) =>
+                a.id === existing.id
+                  ? { ...a, status, responseTime, note: note ?? a.note, source: "manual" }
+                  : a,
+              ),
+            };
+          }
+          return {
+            attendance: [
+              ...s.attendance,
+              {
+                id: uid("att"),
+                courseId,
+                scheduleId,
+                date,
+                status,
+                responseTime,
+                note,
+                source: "manual",
+              },
+            ],
+          };
+        }),
+
       addMaterial: (m) => set((s) => ({ materials: [{ ...m, id: uid("mat") }, ...s.materials] })),
       deleteMaterial: (id) =>
         set((s) => ({ materials: s.materials.filter((m) => m.id !== id) })),
@@ -347,6 +402,32 @@ setTheme: (theme) => set({ theme }),
         set((s) => ({ personalEvents: [{ ...e, id: uid("pe") }, ...s.personalEvents] })),
       deletePersonalEvent: (id) =>
         set((s) => ({ personalEvents: s.personalEvents.filter((e) => e.id !== id) })),
+
+      addSemesterDay: (d) => {
+        const id = uid("sd");
+        set((s) => ({ semesterDays: [...s.semesterDays, { ...d, id }] }));
+        return id;
+      },
+      updateSemesterDay: (id, patch) =>
+        set((s) => ({
+          semesterDays: s.semesterDays.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+        })),
+      deleteSemesterDay: (id) =>
+        set((s) => ({ semesterDays: s.semesterDays.filter((d) => d.id !== id) })),
+
+      addNote: (n) => {
+        const id = uid("note");
+        const now = new Date().toISOString();
+        set((s) => ({ notes: [{ ...n, id, createdAt: now, updatedAt: now }, ...s.notes] }));
+        return id;
+      },
+      updateNote: (id, patch) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n,
+          ),
+        })),
+      deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
 
       markNotificationRead: (id) =>
         set((s) => ({
@@ -396,6 +477,7 @@ setTheme: (theme) => set({ theme }),
         profile: s.profile,
         activeSemesterId: s.activeSemesterId,
         semesters: s.semesters,
+        semesterDays: s.semesterDays,
         professors: s.professors,
         classrooms: s.classrooms,
         courses: s.courses,
@@ -408,6 +490,7 @@ setTheme: (theme) => set({ theme }),
         notionWorkspaces: s.notionWorkspaces,
         materials: s.materials,
         personalEvents: s.personalEvents,
+        notes: s.notes,
         theme: s.theme,
       }),
     },
@@ -428,3 +511,4 @@ export { buildSeedData };
 export type { AppStore };
 export type { AssessmentKind };
 export type { TaskPriority, TaskStatus };
+export type { NoteKind, SemesterDayKind };

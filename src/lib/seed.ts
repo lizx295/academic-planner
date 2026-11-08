@@ -3,6 +3,7 @@ import { addDays, addMonths, addWeeks, format, setDay, startOfWeek } from "date-
 import { uid } from "@/lib/utils";
 import type {
   Semester,
+  SemesterDay,
   Professor,
   Classroom,
   Course,
@@ -15,6 +16,7 @@ import type {
   NotionWorkspace,
   Material,
   PersonalEvent,
+  Note,
   Profile,
   Weekday,
   CourseColor,
@@ -65,6 +67,7 @@ export interface AppData {
   profile: Profile;
   activeSemesterId: string;
   semesters: Semester[];
+  semesterDays: SemesterDay[];
   professors: Professor[];
   classrooms: Classroom[];
   courses: Course[];
@@ -77,6 +80,7 @@ export interface AppData {
   notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
+  notes: Note[];
 }
 
 export function buildSeedData(): AppData {
@@ -460,6 +464,50 @@ export function buildSeedData(): AppData {
     { id: uid("pe"), title: "Cita médica", date: day(8), startTime: "09:30", endTime: "10:15", allDay: false },
   ];
 
+  /* ---------------- Días especiales del semestre ---------------- */
+  const semesterDays: SemesterDay[] = [
+    { id: uid("sd"), semesterId: "sem-2026-2", date: day(-9), kind: "holiday", label: "Feriado nacional" },
+    { id: uid("sd"), semesterId: "sem-2026-2", date: day(6), kind: "no_class", label: "Suspensión de clases" },
+    { id: uid("sd"), semesterId: "sem-2026-2", date: day(14), kind: "exam_period", label: "Inicio de exámenes parciales" },
+  ];
+
+  /* ---------------- Notas y recordatorios ---------------- */
+  const notes: Note[] = [
+    {
+      id: uid("note"),
+      title: "Repasar normalización 3FN",
+      body: "Ver ejemplos de dependencias transitivas antes del quiz.",
+      kind: "reminder",
+      courseId: "co3",
+      dueDate: day(1),
+      createdAt: new Date(now.getTime() - 1000 * 60 * 90).toISOString(),
+      updatedAt: new Date(now.getTime() - 1000 * 60 * 90).toISOString(),
+      source: "manual",
+    },
+    {
+      id: uid("note"),
+      title: "Ideas para el proyecto de aplicación",
+      body: "Un planificador que se conecte con el Aula Virtual y envíe recordatorios.",
+      kind: "project",
+      courseId: "co1",
+      dueDate: day(12),
+      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 20).toISOString(),
+      updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 20).toISOString(),
+      source: "manual",
+    },
+    {
+      id: uid("note"),
+      title: "Lección: protocolos MAC",
+      body: "CSMA/CA, ventanas de contención y diferencias con CSMA/CD.",
+      kind: "lesson",
+      courseId: "co2",
+      dueDate: null,
+      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 48).toISOString(),
+      updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 48).toISOString(),
+      source: "manual",
+    },
+  ];
+
   return {
     profile: {
       name: "Alex Rivera",
@@ -470,6 +518,7 @@ export function buildSeedData(): AppData {
     },
     activeSemesterId: "sem-2026-2",
     semesters,
+    semesterDays,
     professors,
     classrooms,
     courses,
@@ -482,6 +531,7 @@ export function buildSeedData(): AppData {
     notionWorkspaces,
     materials,
     personalEvents,
+    notes,
   };
 }
 
@@ -497,6 +547,7 @@ export function emptyData(): AppData {
     },
     activeSemesterId: "",
     semesters: [],
+    semesterDays: [],
     professors: [],
     classrooms: [],
     courses: [],
@@ -509,5 +560,6 @@ export function emptyData(): AppData {
     notionWorkspaces: [],
     materials: [],
     personalEvents: [],
+    notes: [],
   };
 }

@@ -37,6 +37,17 @@ export type CourseColor =
   | "violet"
   | "slate";
 
+export type SemesterDayKind = "holiday" | "no_class" | "special" | "exam_period";
+
+/** Día marcado dentro de un semestre (feriado, suspensión, período de exámenes…) */
+export interface SemesterDay {
+  id: ID;
+  semesterId: ID;
+  date: string; // ISO date yyyy-MM-dd
+  kind: SemesterDayKind;
+  label: string;
+}
+
 /** Materia de un semestre */
 export interface Course {
   id: ID;
@@ -49,6 +60,9 @@ export interface Course {
   credits: number;
   /** URL de la página de Notion asociada (integración manual v1) */
   notionUrl: string | null;
+  /** id del curso en el Aula Virtual (Moodle) cuando se importó */
+  moodleCourseId?: number | null;
+  source?: "manual" | "aulavirtual" | "notion";
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
@@ -72,6 +86,8 @@ export interface AttendanceRecord {
   date: string; // ISO date yyyy-MM-dd (fecha de la sesión)
   status: AttendanceStatus;
   responseTime: string | null; // ISO datetime cuando el estudiante respondió
+  note?: string;
+  source?: string;
 }
 
 export type TaskStatus = "pending" | "in_progress" | "completed";
@@ -87,6 +103,10 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   createdAt: string; // ISO datetime
+  /** Identificador estable de una integración (Moodle, Notion…) */
+  externalId?: string;
+  notionPageId?: string;
+  source?: string;
 }
 
 export type AssessmentKind =
@@ -108,6 +128,8 @@ export interface Assessment {
   time: string | null; // "HH:mm" opcional
   weight: number; // porcentaje del semestre (0-100)
   status: AssessmentStatus;
+  externalId?: string;
+  source?: string;
 }
 
 export interface Grade {
@@ -135,6 +157,8 @@ export interface AppNotification {
   read: boolean;
   /** Relación opcional con una entidad (ej. attendance id) */
   refId: ID | null;
+  externalId?: string;
+  source?: string;
 }
 
 /** Espacio de trabajo de Notion asociado a una materia */
@@ -150,6 +174,23 @@ export interface NotionWorkspace {
 
 export type MaterialKind = "pdf" | "slides" | "link" | "video" | "doc";
 
+/** Tipo de captura rápida / nota académica */
+export type NoteKind = "note" | "lesson" | "reminder" | "task" | "exam" | "project";
+
+export interface Note {
+  id: ID;
+  title: string;
+  body: string;
+  kind: NoteKind;
+  courseId: ID | null;
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  externalId?: string;
+  notionPageId?: string;
+  source?: string;
+}
+
 export interface Material {
   id: ID;
   courseId: ID;
@@ -158,7 +199,7 @@ export interface Material {
   url: string;
 }
 
-export type EventKind = "class" | "task" | "exam" | "project" | "delivery" | "personal";
+export type EventKind = "class" | "task" | "exam" | "project" | "delivery" | "personal" | "holiday";
 
 /** Evento personal (no académico) del calendario */
 export interface PersonalEvent {
@@ -168,6 +209,8 @@ export interface PersonalEvent {
   startTime: string | null; // "HH:mm"
   endTime: string | null;
   allDay: boolean;
+  externalId?: string;
+  source?: string;
 }
 
 export type ThemePreference = "system" | "light" | "dark";

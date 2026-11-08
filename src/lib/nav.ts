@@ -1,12 +1,18 @@
 import {
   CalendarDays,
-  SquareCheck,
+  Camera,
   ClipboardList,
   Home,
   NotebookPen,
   Settings,
+  SquareCheck,
   BookOpen,
   UserCheck,
+  Users,
+  Link2,
+  Zap,
+  Sparkles,
+  Cable,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +33,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/", label: "Inicio", icon: Home },
       { href: "/calendar", label: "Calendario", icon: CalendarDays },
+      { href: "/capture", label: "Captura rápida", icon: Sparkles },
     ],
   },
   {
@@ -36,13 +43,25 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/tasks", label: "Tareas", icon: SquareCheck },
       { href: "/assessments", label: "Evaluaciones", icon: ClipboardList },
       { href: "/attendance", label: "Asistencia", icon: UserCheck },
+      { href: "/scan", label: "Escanear calendario", icon: Camera },
     ],
   },
   {
     title: "Espacio",
-    items: [{ href: "/notes", label: "Workspace", icon: NotebookPen }],
+    items: [
+      { href: "/notes", label: "Workspace", icon: NotebookPen },
+      { href: "/integrations", label: "Integraciones", icon: Cable },
+      { href: "/shortcuts", label: "Atajos y API", icon: Zap },
+      { href: "/connect", label: "Dispositivos", icon: Link2 },
+    ],
   },
 ];
+
+export const ADMIN_ITEM: NavItem = {
+  href: "/admin",
+  label: "Administración",
+  icon: Users,
+};
 
 export const SETTINGS_ITEM: NavItem = {
   href: "/settings",
@@ -60,14 +79,19 @@ export const MOBILE_NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
   { href: "/courses", label: "Materias", icon: BookOpen },
-  { href: "/tasks", label: "Tareas", icon: SquareCheck },
+  { href: "/capture", label: "Captura", icon: Sparkles },
 ];
 
 /** Rutas agrupadas bajo el botón "Más" en móvil. */
 export const MOBILE_MORE_ITEMS: NavItem[] = [
+  { href: "/tasks", label: "Tareas", icon: SquareCheck },
   { href: "/assessments", label: "Evaluaciones", icon: ClipboardList },
   { href: "/attendance", label: "Asistencia", icon: UserCheck },
   { href: "/notes", label: "Workspace", icon: NotebookPen },
+  { href: "/scan", label: "Escanear calendario", icon: Camera },
+  { href: "/integrations", label: "Integraciones", icon: Cable },
+  { href: "/shortcuts", label: "Atajos y API", icon: Zap },
+  { href: "/connect", label: "Dispositivos", icon: Link2 },
   { href: "/settings", label: "Configuración", icon: Settings },
 ];
 

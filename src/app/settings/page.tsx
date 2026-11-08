@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  ArrowRight,
+  BellRing,
   Building2,
+  Cable,
   Download,
+  KeyRound,
+  Link2,
+  LogOut,
   Moon,
   Palette,
   RefreshCcw,
+  ShieldCheck,
+  Smartphone,
   Sun,
   Upload,
   User,
@@ -14,6 +23,9 @@ import {
   Zap,
 } from "lucide-react";
 
+import { useSession } from "@/components/auth/session";
+import { InstallCard } from "@/components/pwa/InstallCard";
+import { PushToggle } from "@/components/pwa/PushToggle";
 import { useAppStore } from "@/store/app";
 import { resolveTheme, useTheme } from "@/hooks/useTheme";
 import type { ThemePreference } from "@/types";
@@ -33,6 +45,7 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
 ];
 
 export default function SettingsPage() {
+  const { user, logout } = useSession();
   const { theme, setTheme } = useTheme();
   const resolved = resolveTheme(theme);
   const profile = useAppStore((s) => s.profile);
@@ -63,6 +76,7 @@ export default function SettingsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   function saveProfile() {
     updateProfile({
@@ -86,6 +100,7 @@ export default function SettingsPage() {
       profile: s.profile,
       activeSemesterId: s.activeSemesterId,
       semesters: s.semesters,
+      semesterDays: s.semesterDays,
       professors: s.professors,
       classrooms: s.classrooms,
       courses: s.courses,
@@ -97,6 +112,8 @@ export default function SettingsPage() {
       materials: s.materials,
       notionWorkspaces: s.notionWorkspaces,
       personalEvents: s.personalEvents,
+      notes: s.notes,
+      notifications: s.notifications,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -115,8 +132,108 @@ export default function SettingsPage() {
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <PageHeader
         title="Configuración"
-        subtitle="Personaliza la app, tus datos y el respaldo."
+        subtitle="Tu cuenta, la nube, las notificaciones y el respaldo de tus datos."
       />
+
+      <Card className="p-4 sm:p-5">
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-text-faint" aria-hidden="true" />
+              Cuenta institucional
+            </span>
+          }
+          description="Sesión iniciada con tu correo ESPOL. La nube guarda tus datos de forma privada."
+        />
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-text">
+              {user.name || user.email}
+            </p>
+            <p className="truncate text-[12px] text-text-muted">{user.email}</p>
+            <span className="mt-1 inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+              {user.role === "admin" ? "Administrador" : "Estudiante"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button variant="secondary" size="sm" onClick={() => setPasswordOpen(true)}>
+              <KeyRound size={13} aria-hidden="true" /> Cambiar contraseña
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-absent hover:bg-absent-soft"
+              onClick={() => void logout()}
+            >
+              <LogOut size={13} aria-hidden="true" /> Cerrar sesión
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="p-4 sm:p-5">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <BellRing size={16} className="text-text-faint" aria-hidden="true" />
+                Notificaciones
+              </span>
+            }
+            description="Avisos de tareas, evaluaciones y clases que están por vencer."
+          />
+          <div className="mt-3">
+            <PushToggle />
+          </div>
+        </Card>
+
+        <Card className="p-4 sm:p-5">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <Smartphone size={16} className="text-text-faint" aria-hidden="true" />
+                App en tu teléfono
+              </span>
+            }
+            description="Instálala para pantalla completa y notificaciones push."
+          />
+          <div className="mt-3">
+            <InstallCard />
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-4 sm:p-5">
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2">
+              <Link2 size={16} className="text-text-faint" aria-hidden="true" />
+              Nube, dispositivos e integraciones
+            </span>
+          }
+          description="Sincroniza laptop y teléfono, conecta Notion y tu Aula Virtual, o crea atajos."
+        />
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {[
+            { href: "/connect", label: "Dispositivos y sync", icon: Link2 },
+            { href: "/integrations", label: "Notion y Aula Virtual", icon: Cable },
+            { href: "/shortcuts", label: "Atajos y API", icon: Zap },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-subtle/40 px-3 py-2.5 text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-subtle hover:text-text"
+              >
+                <Icon size={15} aria-hidden="true" className="text-accent" />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                <ArrowRight size={13} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      </Card>
 
       <Card className="p-4 sm:p-5">
         <CardHeader
@@ -360,10 +477,13 @@ export default function SettingsPage() {
           </Button>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-text-faint">
-          Todo se guarda solo en este navegador (localStorage). Los datos de ejemplo no pertenecen a
-          ninguna universidad: son inventados para que la app se vea viva.
+          Tus datos se guardan al instante en este dispositivo y se sincronizan cifrados con tu
+          cuenta en la nube. Puedes descargar un respaldo JSON cuando quieras. Los datos de ejemplo
+          son inventados para que la app se vea viva.
         </p>
       </Card>
+
+      <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} courses={courses} />
 
@@ -423,5 +543,124 @@ export default function SettingsPage() {
         </p>
       </Dialog>
     </div>
+  );
+}
+
+function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setError(null);
+      setDone(false);
+    }
+  }, [open]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (next.length < 8 || !/[A-Za-z]/.test(next) || !/[0-9]/.test(next)) {
+      setError("La nueva contraseña debe tener al menos 8 caracteres, con letras y números.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo cambiar la contraseña.");
+        return;
+      }
+      setDone(true);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch {
+      setError("No hay conexión con el servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Cambiar contraseña"
+      description="Después del cambio, el administrador ya no podrá ver ninguna contraseña tuya."
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cerrar
+          </Button>
+          <Button type="submit" form="change-password-form" variant="primary" loading={loading}>
+            Guardar contraseña
+          </Button>
+        </>
+      }
+    >
+      <form id="change-password-form" onSubmit={submit} className="space-y-3">
+        <FieldShell label="Contraseña actual" htmlFor="pw-current">
+          <Input
+            id="pw-current"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            placeholder="Tu contraseña actual"
+          />
+        </FieldShell>
+        <FieldShell label="Nueva contraseña" htmlFor="pw-next">
+          <Input
+            id="pw-next"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="Mínimo 8 caracteres"
+          />
+        </FieldShell>
+        <FieldShell label="Confirma la nueva contraseña" htmlFor="pw-confirm">
+          <Input
+            id="pw-confirm"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Repite la nueva contraseña"
+          />
+        </FieldShell>
+        {done ? (
+          <p className="rounded-xl border border-border bg-present-soft px-3 py-2 text-[13px] font-medium text-present">
+            Contraseña actualizada correctamente.
+          </p>
+        ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-border bg-absent-soft px-3 py-2 text-[13px] font-medium text-absent"
+          >
+            {error}
+          </p>
+        ) : null}
+      </form>
+    </Dialog>
   );
 }
