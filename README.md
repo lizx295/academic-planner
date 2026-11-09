@@ -66,8 +66,13 @@ npm run typecheck    # TypeScript sin emitir
 npm run lint         # ESLint
 npm run build        # build de producción
 npm start            # sirve el build
+npm run preview      # build + servidor de producción en un solo paso
 node scripts/generate-icons.mjs  # regenera los íconos PWA
 ```
+
+> Para el uso diario, corre la app en modo producción (`npm run preview` o
+> `npm run build && npm start`). `npm run dev` recompila rutas bajo demanda y
+> desactiva la precarga de enlaces, así que se siente más lento.
 
 El esquema de la base de datos se crea solo (`ensureSchema`) en el primer
 request a una ruta de API. No hay migraciones manuales.

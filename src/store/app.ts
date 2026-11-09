@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { buildSeedData, emptyData } from "@/lib/seed";
+import { persistStorage } from "@/store/persist-storage";
 import { uid } from "@/lib/utils";
 import type {
   AppNotification,
@@ -14,7 +15,6 @@ import type {
   CourseSchedule,
   Grade,
   Material,
-  MaterialKind,
   Note,
   NoteKind,
   NotionWorkspace,
@@ -341,7 +341,7 @@ setTheme: (theme) => set({ theme }),
             notifications: [
               {
                 id: uid("not"),
-                kind: "attendance_confirm",
+                kind: "attendance_confirm" as const,
                 title: status === "present" ? "Asistencia registrada" : "Inasistencia registrada",
                 body: `${course?.name ?? "Materia"} — ${status === "present" ? "confirmaste que asististe" : "marcaste que no asististe"}.`,
                 createdAt: new Date().toISOString(),
@@ -349,7 +349,7 @@ setTheme: (theme) => set({ theme }),
                 refId: id,
               },
               ...s.notifications,
-            ],
+            ].slice(0, 300),
           };
         }),
 
@@ -472,6 +472,7 @@ setTheme: (theme) => set({ theme }),
     {
       name: "academic-planner-store",
       version: 1,
+      storage: persistStorage,
       partialize: (s) => ({
         initialized: s.initialized,
         profile: s.profile,

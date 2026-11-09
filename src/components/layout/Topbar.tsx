@@ -50,6 +50,8 @@ function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unread = notifications.filter((n) => !n.read).length;
+  // El panel muestra las más recientes; el resto se conserva en el historial.
+  const visible = notifications.slice(0, 40);
 
   useEffect(() => {
     if (!open) return;
@@ -111,7 +113,7 @@ function NotificationBell() {
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {notifications.map((n) => {
+                {visible.map((n) => {
                   const Icon = NOTIFICATION_ICON[n.kind];
                   return (
                     <li key={n.id}>
@@ -211,7 +213,7 @@ function SyncBadge() {
       <Icon
         size={12}
         aria-hidden="true"
-        className={status === "syncing" || status === "idle" ? "animate-spin" : undefined}
+        className={status === "syncing" ? "animate-spin" : undefined}
       />
       {label}
     </span>

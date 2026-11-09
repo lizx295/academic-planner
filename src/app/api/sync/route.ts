@@ -3,6 +3,7 @@ import { requireUser } from "@/server/auth";
 import {
   assertSnapshotShape,
   readSnapshot,
+  readSnapshotMeta,
   upsertSnapshot,
   writeSnapshot,
 } from "@/server/snapshot";
@@ -11,10 +12,19 @@ import { ApiError, guard } from "@/server/validate";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(req: Request): Promise<Response> {
   return guard(async () => {
     await ensureReady();
     const user = await requireUser();
+    const url = new URL(req.url);
+
+    // Sondeo ligero: los clientes preguntan la versión y solo descargan el
+    // documento completo cuando realmente cambió.
+    if (url.searchParams.get("meta") === "1") {
+      const meta = await readSnapshotMeta(user.id);
+      return Response.json(meta, { headers: { "cache-control": "no-store" } });
+    }
+
     const snapshot = await readSnapshot(user.id);
     if (!snapshot) {
       return Response.json({ data: null, version: 0, updatedAt: null });

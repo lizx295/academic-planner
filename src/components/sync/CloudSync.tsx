@@ -30,7 +30,7 @@ const DATA_KEYS = [
   "notes",
 ] as const;
 
-const POLL_MS = 8000;
+const POLL_MS = 15000;
 const PUSH_DEBOUNCE_MS = 1200;
 
 function dataOf(): Record<string, unknown> {
@@ -184,6 +184,13 @@ export function CloudSync() {
   const pull = useCallback(async () => {
     if (dirty.current || pushing.current) return;
     try {
+      // 1) Sondeo barato: solo la versión.
+      const metaRes = await fetch("/api/sync?meta=1", { cache: "no-store" });
+      if (!metaRes.ok) return;
+      const meta = (await metaRes.json()) as { version: number };
+      if (!meta.version || meta.version <= knownVersion.current) return;
+
+      // 2) Solo si cambió, descarga el documento.
       const res = await fetch("/api/sync", { cache: "no-store" });
       if (!res.ok) return;
       const snap = (await res.json()) as {

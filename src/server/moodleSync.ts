@@ -288,7 +288,7 @@ export function applyMoodleSync(
   data.tasks = tasks;
   data.assessments = assessments;
   data.grades = grades;
-  data.notifications = notifications;
+  data.notifications = notifications.slice(0, 300);
   data.personalEvents = personalEvents;
 
   return { data, counts };

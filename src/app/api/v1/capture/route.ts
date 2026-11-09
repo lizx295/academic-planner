@@ -129,7 +129,7 @@ export async function POST(req: Request): Promise<Response> {
       });
 
       return {
-        data: { ...data, notes, tasks, assessments, notifications },
+        data: { ...data, notes, tasks, assessments, notifications: notifications.slice(0, 300) },
         result: { noteId, refId, type, courseId },
       };
     });

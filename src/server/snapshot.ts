@@ -30,6 +30,22 @@ export async function readSnapshot(userId: string): Promise<Snapshot | null> {
 }
 
 /**
+ * Consulta barata para saber si hay cambios remotos sin transferir el
+ * documento completo. La usan los clientes antes de descargar el snapshot.
+ */
+export async function readSnapshotMeta(
+  userId: string,
+): Promise<{ version: number; updatedAt: string | null }> {
+  const sql = getSql();
+  const rows = await sql<{ version: string | number; updated_at: Date }[]>`
+    select version, updated_at from snapshots where user_id = ${userId} limit 1
+  `;
+  const row = rows[0];
+  if (!row) return { version: 0, updatedAt: null };
+  return { version: toVersion(row.version), updatedAt: new Date(row.updated_at).toISOString() };
+}
+
+/**
  * Escritura optimista. Devuelve null si la versión base ya no coincide
  * (otro dispositivo escribió primero).
  */

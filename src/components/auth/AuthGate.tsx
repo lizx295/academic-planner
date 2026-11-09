@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { SessionProvider, type SessionUser } from "@/components/auth/session";
@@ -15,13 +15,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const booted = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
       if (!res.ok) {
         setUser(null);
-        const next = encodeURIComponent(pathname || "/");
+        const next = encodeURIComponent(window.location.pathname || "/");
         router.replace(`/login?next=${next}`);
         return;
       }
@@ -38,17 +39,39 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [pathname, router]);
+  }, [router]);
 
   useEffect(() => {
     if (isPublic(pathname)) {
+      booted.current = false;
       setLoading(false);
       return;
     }
+    // La sesión se valida una sola vez por carga de la app: navegar entre
+    // páginas ya no dispara una petición extra a /api/auth/me.
+    if (booted.current) return;
+    booted.current = true;
     void load();
   }, [pathname, load]);
 
+  // Revalida al volver a la pestaña después de un rato (sesión revocada,
+  // cambio de contraseña en otro dispositivo, etc.).
+  useEffect(() => {
+    if (isPublic(pathname)) return;
+    let lastCheck = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastCheck < 5 * 60_000) return;
+      lastCheck = Date.now();
+      void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [pathname, load]);
+
   const logout = useCallback(async () => {
+    setUser(null);
+    booted.current = false;
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
