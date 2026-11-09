@@ -58,11 +58,9 @@ export interface Course {
   classroomId: ID;
   color: CourseColor;
   credits: number;
-  /** URL de la página de Notion asociada (integración manual v1) */
-  notionUrl: string | null;
   /** id del curso en el Aula Virtual (Moodle) cuando se importó */
   moodleCourseId?: number | null;
-  source?: "manual" | "aulavirtual" | "notion";
+  source?: "manual" | "aulavirtual";
 }
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
@@ -103,9 +101,8 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   createdAt: string; // ISO datetime
-  /** Identificador estable de una integración (Moodle, Notion…) */
+  /** Identificador estable de una integración (Moodle) */
   externalId?: string;
-  notionPageId?: string;
   source?: string;
 }
 
@@ -161,17 +158,6 @@ export interface AppNotification {
   source?: string;
 }
 
-/** Espacio de trabajo de Notion asociado a una materia */
-export interface NotionWorkspace {
-  id: ID;
-  courseId: ID;
-  title: string;
-  pageUrl: string;
-  /** "manual" = URL guardada por el usuario; "api" = sincronizado por la API (futuro) */
-  integration: "manual" | "api";
-  lastSyncedAt: string | null;
-}
-
 export type MaterialKind = "pdf" | "slides" | "link" | "video" | "doc";
 
 /** Tipo de captura rápida / nota académica */
@@ -187,7 +173,6 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   externalId?: string;
-  notionPageId?: string;
   source?: string;
 }
 

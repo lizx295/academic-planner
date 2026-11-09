@@ -110,7 +110,6 @@ export default function SettingsPage() {
       assessments: s.assessments,
       grades: s.grades,
       materials: s.materials,
-      notionWorkspaces: s.notionWorkspaces,
       personalEvents: s.personalEvents,
       notes: s.notes,
       notifications: s.notifications,
@@ -211,12 +210,12 @@ export default function SettingsPage() {
               Nube, dispositivos e integraciones
             </span>
           }
-          description="Sincroniza laptop y teléfono, conecta Notion y tu Aula Virtual, o crea atajos."
+          description="Sincroniza laptop y teléfono, conecta tu Aula Virtual, o crea atajos."
         />
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
             { href: "/connect", label: "Dispositivos y sync", icon: Link2 },
-            { href: "/integrations", label: "Notion y Aula Virtual", icon: Cable },
+            { href: "/integrations", label: "Aula Virtual", icon: Cable },
             { href: "/shortcuts", label: "Atajos y API", icon: Zap },
           ].map((item) => {
             const Icon = item.icon;

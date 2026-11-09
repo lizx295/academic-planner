@@ -10,7 +10,6 @@ import {
   BookOpen,
   CalendarClock,
   CheckCircle2,
-  Clock,
   ExternalLink,
   FileText,
   Link2,
@@ -50,7 +49,6 @@ import { GradeDialog } from "@/components/assessments/GradeDialog";
 import { AttendanceRow } from "@/components/attendance/AttendanceRow";
 import { AttendanceCorrectionDialog } from "@/components/attendance/AttendanceCorrectionDialog";
 import { MaterialFormDialog } from "@/components/materials/MaterialFormDialog";
-import { WorkspaceDialog } from "@/components/notes/WorkspaceDialog";
 
 type Tab =
   | "resumen"
@@ -59,8 +57,7 @@ type Tab =
   | "tareas"
   | "evaluaciones"
   | "calificaciones"
-  | "materiales"
-  | "workspace";
+  | "materiales";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "resumen", label: "Resumen" },
@@ -70,7 +67,6 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "evaluaciones", label: "Evaluaciones" },
   { id: "calificaciones", label: "Calificaciones" },
   { id: "materiales", label: "Materiales" },
-  { id: "workspace", label: "Workspace" },
 ];
 
 const MATERIAL_ICON = {
@@ -96,7 +92,6 @@ export default function CourseDetailPage() {
   const classrooms = useAppStore((s) => s.classrooms);
   const semesters = useAppStore((s) => s.semesters);
   const materials = useAppStore((s) => s.materials);
-  const notionWorkspaces = useAppStore((s) => s.notionWorkspaces);
   const deleteCourse = useAppStore((s) => s.deleteCourse);
   const deleteTask = useAppStore((s) => s.deleteTask);
   const deleteAssessment = useAppStore((s) => s.deleteAssessment);
@@ -117,7 +112,6 @@ export default function CourseDetailPage() {
   const [gradeFor, setGradeFor] = useState<Assessment | null>(null);
   const [correcting, setCorrecting] = useState<AttendanceRecord | null>(null);
   const [materialOpen, setMaterialOpen] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const courseSched = useMemo(
@@ -147,10 +141,6 @@ export default function CourseDetailPage() {
   const courseMaterials = useMemo(
     () => materials.filter((m) => m.courseId === courseId).sort((a, b) => a.title.localeCompare(b.title)),
     [materials, courseId],
-  );
-  const workspace = useMemo(
-    () => notionWorkspaces.find((w) => w.courseId === courseId),
-    [notionWorkspaces, courseId],
   );
 
   if (!course) {
@@ -330,12 +320,15 @@ export default function CourseDetailPage() {
             <Card className="p-4">
               <CardHeader
                 title="Acceso rápido"
-                description="Páginas de apuntes y recursos de la materia"
+                description="Apuntes y recursos de la materia"
               />
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setWorkspaceOpen(true)}>
-                  <ExternalLink size={14} /> Notion
-                </Button>
+                <Link
+                  href="/notes"
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-border bg-surface px-3 text-[13px] font-medium text-text transition-colors hover:bg-surface-subtle"
+                >
+                  <ExternalLink size={14} /> Notas
+                </Link>
                 <Button variant="secondary" size="sm" onClick={() => setMaterialOpen(true)}>
                   <Plus size={14} /> Material
                 </Button>
@@ -617,17 +610,6 @@ export default function CourseDetailPage() {
             )}
           </Card>
         ) : null}
-
-        {tab === "workspace" ? (
-          <WorkspaceSection
-            courseId={course.id}
-            courseName={course.name}
-            courseColor={course.color}
-            workspace={workspace}
-            onEdit={() => setWorkspaceOpen(true)}
-            onConnect={() => setWorkspaceOpen(true)}
-          />
-        ) : null}
       </div>
 
       <CourseFormDialog open={formOpen} onClose={() => setFormOpen(false)} course={course} />
@@ -651,13 +633,6 @@ export default function CourseDetailPage() {
         onClose={() => setCorrecting(null)}
       />
       <MaterialFormDialog open={materialOpen} onClose={() => setMaterialOpen(false)} courses={courses} defaultCourseId={course.id} />
-      <WorkspaceDialog
-        open={workspaceOpen}
-        onClose={() => setWorkspaceOpen(false)}
-        courseId={course.id}
-        courseName={course.name}
-        workspace={workspace}
-      />
 
       <Dialog
         open={confirmDelete}
@@ -712,78 +687,4 @@ function courseAttRecords(records: AttendanceRecord[], courseId: string): Attend
   return records
     .filter((r) => r.courseId === courseId)
     .sort((a, b) => b.date.localeCompare(a.date));
-}
-
-function WorkspaceSection({
-  courseId,
-  courseName,
-  courseColor,
-  workspace,
-  onEdit,
-  onConnect,
-}: {
-  courseId: string;
-  courseName: string;
-  courseColor: CourseColor;
-  workspace?: { title: string; pageUrl: string; integration: "manual" | "api" } | null;
-  onEdit: () => void;
-  onConnect: () => void;
-}) {
-  const cls = courseColorClasses(courseColor);
-  if (!workspace) {
-    return (
-      <Card className="p-4">
-        <CardHeader
-          title="Workspace de Notion"
-          description="Guarda el enlace a tu página de apuntes de esta materia y ábrela con un toque."
-        />
-        <div className="mt-4">
-          <Button variant="primary" onClick={onConnect}>
-            <ExternalLink size={14} /> Conectar página
-          </Button>
-        </div>
-        <p className="mt-3 text-xs text-text-faint">
-          La sincronización automática de contenido con la API de Notion es una integración en
-          desarrollo; por ahora el enlace se guarda de forma local.
-        </p>
-      </Card>
-    );
-  }
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl", cls.soft, cls.text)}>
-            <ExternalLink size={18} aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-text">{workspace.title}</p>
-            <Badge tone={workspace.integration === "api" ? "info" : "neutral"} className="mt-1">
-              {workspace.integration === "api" ? "API" : "Manual"}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={onEdit}>
-            Editar
-          </Button>
-          <a
-            href={workspace.pageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-medium text-on-accent transition-opacity hover:opacity-90"
-          >
-            Abrir <ExternalLink size={14} aria-hidden="true" />
-          </a>
-        </div>
-      </div>
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-surface-subtle px-3 py-2.5 text-[13px] leading-relaxed text-text-muted">
-        <Clock size={15} className="mt-0.5 shrink-0 text-text-faint" aria-hidden="true" />
-        <span>
-          Este workspace está vinculado a <span className="font-medium text-text">{courseName}</span>{" "}
-          (enlace guardado localmente).
-        </span>
-      </div>
-    </Card>
-  );
 }

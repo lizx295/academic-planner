@@ -16,13 +16,27 @@ const ARRAY_KEYS = [
   "assessments",
   "grades",
   "notifications",
-  "notionWorkspaces",
   "materials",
   "personalEvents",
   "notes",
 ] as const;
 
 type Data = Record<string, unknown>;
+
+/** Copia cliente de `stripLegacyData` (ver `src/server/snapshot.ts`). */
+export function stripLegacyData(data: Data): Data {
+  const out: Data = { ...data };
+  delete out.notionWorkspaces;
+  if (Array.isArray(out.courses)) {
+    out.courses = (out.courses as Array<Record<string, unknown>>).map((course) => {
+      if (!course || typeof course !== "object" || !("notionUrl" in course)) return course;
+      const copy = { ...course };
+      delete copy.notionUrl;
+      return copy;
+    });
+  }
+  return out;
+}
 
 export function mergeSnapshots(server: Data, local: Data): Data {
   const out: Data = { ...server, ...local };
@@ -48,5 +62,5 @@ export function mergeSnapshots(server: Data, local: Data): Data {
 
   if (!out.activeSemesterId && server.activeSemesterId) out.activeSemesterId = server.activeSemesterId;
   if (!out.theme && server.theme) out.theme = server.theme;
-  return out;
+  return stripLegacyData(out);
 }

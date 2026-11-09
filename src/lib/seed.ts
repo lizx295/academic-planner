@@ -13,7 +13,6 @@ import type {
   Assessment,
   Grade,
   AppNotification,
-  NotionWorkspace,
   Material,
   PersonalEvent,
   Note,
@@ -77,7 +76,6 @@ export interface AppData {
   assessments: Assessment[];
   grades: Grade[];
   notifications: AppNotification[];
-  notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
   notes: Note[];
@@ -212,7 +210,6 @@ export function buildSeedData(): AppData {
     classroomId,
     color,
     credits,
-    notionUrl: null,
   }));
 
   const schedules: CourseSchedule[] = courseDefs.flatMap((c) =>
@@ -236,7 +233,6 @@ export function buildSeedData(): AppData {
       classroomId: "c1",
       color: "slate",
       credits: 4,
-      notionUrl: null,
     },
     {
       id: "co8",
@@ -247,7 +243,6 @@ export function buildSeedData(): AppData {
       classroomId: "c5",
       color: "rose",
       credits: 4,
-      notionUrl: null,
     },
   );
 
@@ -436,18 +431,6 @@ export function buildSeedData(): AppData {
     },
   ];
 
-  /* ---------------- Workspace de Notion (manual) ---------------- */
-  const notionWorkspaces: NotionWorkspace[] = courses
-    .filter((c) => c.semesterId === "sem-2026-2")
-    .map((c) => ({
-      id: uid("nw"),
-      courseId: c.id,
-      title: `Apuntes — ${c.name}`,
-      pageUrl: `https://www.notion.so/${c.code.toLowerCase().replace(/[^a-z0-9]/g, "")}-apuntes-000000`,
-      integration: "manual",
-      lastSyncedAt: null,
-    }));
-
   /* ---------------- Materiales ---------------- */
   const materials: Material[] = [
     { id: uid("mat"), courseId: "co1", title: "Recopilación de apuntes — semana 1 a 4", kind: "pdf", url: "https://example.com/apuntes-prog.pdf" },
@@ -528,7 +511,6 @@ export function buildSeedData(): AppData {
     assessments,
     grades,
     notifications,
-    notionWorkspaces,
     materials,
     personalEvents,
     notes,
@@ -557,7 +539,6 @@ export function emptyData(): AppData {
     assessments: [],
     grades: [],
     notifications: [],
-    notionWorkspaces: [],
     materials: [],
     personalEvents: [],
     notes: [],

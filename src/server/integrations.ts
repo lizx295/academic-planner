@@ -1,6 +1,6 @@
 import { getSql } from "@/server/db";
 
-export type Provider = "notion" | "aulavirtual";
+export type Provider = "aulavirtual";
 
 export interface IntegrationRow {
   provider: Provider;

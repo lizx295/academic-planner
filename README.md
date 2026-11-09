@@ -1,9 +1,9 @@
 # Academic Planner · ESPOL
 
 Planificador académico en forma de PWA: materias, horarios, asistencia, tareas,
-evaluaciones, notas, calendario y workspace por materia. Sincroniza laptop y
-teléfono casi en tiempo real y se conecta con **Notion** y el **Aula Virtual
-ESPOL** (Moodle) usando las credenciales de cada estudiante.
+evaluaciones, notas, calendario y materiales por materia. Sincroniza laptop y
+teléfono casi en tiempo real y se conecta con el **Aula Virtual ESPOL** (Moodle)
+usando las credenciales de cada estudiante.
 
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Zustand,
   date-fns, lucide-react, Tesseract.js.
@@ -13,6 +13,9 @@ ESPOL** (Moodle) usando las credenciales de cada estudiante.
 - **PWA:** manifest, service worker, instalación en iOS/Android y Web Push
   (VAPID).
 - **Diseño:** paleta pastel rosa/menta y superficies tipo “liquid glass”.
+
+La app está pensada para ejecutarse en la nube (Vercel + PostgreSQL administrado),
+así sigue disponible aunque tu computadora esté apagada.
 
 ---
 
@@ -38,25 +41,24 @@ Puedes cambiar estos valores con `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
 
 ## 2. Desarrollo local
 
-### Opción A · Docker (recomendado)
-
-```bash
-cp .env.example .env.local   # opcional: cambia claves
-docker compose up --build
-# abre http://localhost:3000
-```
-
-Levanta PostgreSQL 16 y la app Next.js. Los datos quedan en el volumen
-`pgdata`. Para reiniciar la base: `docker compose down -v`.
-
-### Opción B · Node + PostgreSQL local
+Necesitas Node.js 20+ y un PostgreSQL accesible.
 
 ```bash
 npm install
-docker compose up -d db      # solo la base de datos
-cp .env.example .env.local   # DATABASE_URL ya apunta a localhost:5432
-npm run dev
+cp .env.example .env.local   # ajusta DATABASE_URL y las claves
+npm run dev                  # http://localhost:3000
 ```
+
+Puedes usar un PostgreSQL local (Homebrew, Postgres.app) o directamente la base
+de datos administrada que usarás en producción:
+
+```bash
+createdb academic_planner
+# DATABASE_URL=postgres://usuario:clave@localhost:5432/academic_planner
+```
+
+El esquema de la base de datos se crea solo (`ensureSchema`) en el primer
+request a una ruta de API. No hay migraciones manuales.
 
 Scripts útiles:
 
@@ -70,12 +72,10 @@ npm run preview      # build + servidor de producción en un solo paso
 node scripts/generate-icons.mjs  # regenera los íconos PWA
 ```
 
-> Para el uso diario, corre la app en modo producción (`npm run preview` o
-> `npm run build && npm start`). `npm run dev` recompila rutas bajo demanda y
-> desactiva la precarga de enlaces, así que se siente más lento.
-
-El esquema de la base de datos se crea solo (`ensureSchema`) en el primer
-request a una ruta de API. No hay migraciones manuales.
+> Para el uso diario en tu computadora, corre la app en modo producción
+> (`npm run preview` o `npm run build && npm start`). `npm run dev` recompila
+> rutas bajo demanda y desactiva la precarga de enlaces, así que se siente más
+> lento.
 
 ---
 
@@ -86,9 +86,9 @@ obligatorias en producción:
 
 | Variable | Para qué |
 | --- | --- |
-| `DATABASE_URL` | Cadena de PostgreSQL / Supabase |
+| `DATABASE_URL` | Cadena de PostgreSQL / Supabase / Neon |
 | `AUTH_SECRET` | Firma de las sesiones JWT (`openssl rand -base64 48`) |
-| `APP_ENCRYPTION_KEY` | Cifra credenciales de Notion/Aula Virtual y contraseñas temporales |
+| `APP_ENCRYPTION_KEY` | Cifra credenciales del Aula Virtual y contraseñas temporales |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push (`npx web-push generate-vapid-keys`) |
 | `ALLOWED_EMAIL_DOMAINS` | Dominios institucionales permitidos (coma-separados) |
 | `CRON_SECRET` | Protege `/api/cron/reminders` |
@@ -102,13 +102,16 @@ suscripciones caducan al reiniciar). En producción configúralas siempre.
 
 ---
 
-## 4. Despliegue en Vercel + Supabase
+## 4. Despliegue en la nube (Vercel + Supabase)
 
-1. Crea un proyecto en [Supabase](https://supabase.com) (plan gratuito).
-2. En **Project Settings → Database** copia la cadena de conexión
-   “Connection pooling / Transaction” y úsala como `DATABASE_URL`.
-   Con Supabase normalmente funciona `DATABASE_SSL=no-verify`.
-3. Sube el repositorio a GitHub e impórtalo en Vercel.
+Con esto la app queda encendida 24/7 sin depender de tu computadora.
+
+1. Crea un proyecto en [Supabase](https://supabase.com) (plan gratuito) o
+   [Neon](https://neon.tech).
+2. Copia la cadena de conexión **Connection pooling / Transaction** y úsala
+   como `DATABASE_URL`. Con Supabase normalmente funciona
+   `DATABASE_SSL=no-verify`.
+3. Sube el repositorio a GitHub e impórtalo en [Vercel](https://vercel.com).
 4. Define las variables de entorno del punto 3 en Vercel.
 5. Despliega. `vercel.json` ya programa el cron de recordatorios cada 15
    minutos (`/api/cron/reminders`). Vercel envía `CRON_SECRET` como
@@ -117,8 +120,11 @@ suscripciones caducan al reiniciar). En producción configúralas siempre.
 6. Abre la URL en el teléfono y usa **Añadir a pantalla de inicio** (iOS) o
    **Instalar aplicación** (Android).
 
-> El esquema se crea automáticamente en el primer arranque. Para producción
-> usa claves largas y distintas a las de desarrollo.
+> El esquema se crea automáticamente en el primer arranque. Para producción usa
+> claves largas y distintas a las de desarrollo.
+
+También puedes desplegar desde la terminal con `npx vercel` (te pedirá iniciar
+sesión) y cargar las variables con `npx vercel env add`.
 
 ---
 
@@ -129,9 +135,10 @@ suscripciones caducan al reiniciar). En producción configúralas siempre.
   caracteres. El código dura 10 minutos y se usa una sola vez.
 - **Sesiones:** cada dispositivo es una sesión revocable desde `/connect`.
 - **Casi tiempo real:** los cambios se guardan al instante en el dispositivo y
-  se suben a la nube con un debounce; los demás dispositivos consultan cada
-  8 segundos y al volver a la app. Ante ediciones simultáneas, el servidor
-  fusiona por `id` con control de versión optimista.
+  se suben a la nube con un debounce; los demás dispositivos consultan una
+  versión ligera cada 15 segundos y solo descargan el documento si cambió. Ante
+  ediciones simultáneas, el servidor fusiona por `id` con control de versión
+  optimista.
 - **Push:** activa las notificaciones en `/settings` → *Notificaciones*.
 
 ---
@@ -179,20 +186,7 @@ La PWA instalada desde Chrome también recibe Web Push en Android.
 
 ---
 
-## 7. Integraciones
-
-### Notion
-
-1. Crea una integración interna en <https://www.notion.so/my-integrations> y
-   copia el token.
-2. Comparte con la integración la página padre donde quieras guardar los datos.
-3. En `/integrations` pega el token y la URL/ID de la página.
-4. La app crea `Academic Planner · Tareas` y `Academic Planner · Notas`.
-   - *Enviar a Notion:* sube tareas y notas.
-   - *Importar de Notion:* trae cambios hechos en Notion.
-   - *Probar:* verifica el token.
-
-### Aula Virtual ESPOL
+## 7. Aula Virtual ESPOL
 
 1. En `/integrations` escribe tu usuario y contraseña del
    <https://aulavirtual.espol.edu.ec/>.
@@ -241,7 +235,7 @@ src/
   components/     # UI, calendario, asistencia, sync, PWA
   hooks/          # useSemesterData, useTheme
   lib/            # store helpers, seed, calendario, attendance, nav
-  server/         # db, auth, crypto, snapshot, push, Moodle, Notion
+  server/         # db, auth, crypto, snapshot, push, Moodle
   types/          # tipos del dominio
 public/
   sw.js           # service worker (caché + push)
@@ -259,12 +253,12 @@ integraciones, tokens de API y suscripciones push (ver `src/server/schema.ts`).
 ## 11. Comandos de mantenimiento
 
 ```bash
-# reiniciar base local
-docker compose down -v && docker compose up --build
-
 # claves VAPID
 npx web-push generate-vapid-keys
 
 # comprobar salud de la app
 curl http://localhost:3000/api/health
+
+# desplegar a Vercel
+npx vercel
 ```

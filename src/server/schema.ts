@@ -66,7 +66,7 @@ create table if not exists api_tokens (
 
 create table if not exists integrations (
   user_id uuid not null references users(id) on delete cascade,
-  provider text not null check (provider in ('notion', 'aulavirtual')),
+  provider text not null check (provider in ('aulavirtual')),
   config_enc text,
   status text not null default 'disconnected',
   last_sync_at timestamptz,

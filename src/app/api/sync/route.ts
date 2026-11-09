@@ -4,6 +4,7 @@ import {
   assertSnapshotShape,
   readSnapshot,
   readSnapshotMeta,
+  stripLegacyData,
   upsertSnapshot,
   writeSnapshot,
 } from "@/server/snapshot";
@@ -29,9 +30,10 @@ export async function GET(req: Request): Promise<Response> {
     if (!snapshot) {
       return Response.json({ data: null, version: 0, updatedAt: null });
     }
-    return Response.json(snapshot, {
-      headers: { "cache-control": "no-store" },
-    });
+    return Response.json(
+      { ...snapshot, data: stripLegacyData(snapshot.data) },
+      { headers: { "cache-control": "no-store" } },
+    );
   });
 }
 
@@ -43,7 +45,7 @@ export async function PUT(req: Request): Promise<Response> {
       data?: unknown;
       baseVersion?: number;
     };
-    const data = assertSnapshotShape(body.data);
+    const data = stripLegacyData(assertSnapshotShape(body.data));
     const baseVersion = Number(body.baseVersion ?? 0);
     if (!Number.isFinite(baseVersion) || baseVersion < 0) {
       throw new ApiError(400, "baseVersion inválida.");

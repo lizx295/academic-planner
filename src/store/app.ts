@@ -17,7 +17,6 @@ import type {
   Material,
   Note,
   NoteKind,
-  NotionWorkspace,
   PersonalEvent,
   Profile,
   Professor,
@@ -40,7 +39,6 @@ export interface CourseDraft {
   classroomId: string;
   color: CourseColor;
   credits: number;
-  notionUrl?: string | null;
   schedules: Array<{ weekday: Weekday; startTime: string; endTime: string }>;
 }
 
@@ -60,7 +58,6 @@ interface AppStore {
   assessments: Assessment[];
   grades: Grade[];
   notifications: AppNotification[];
-  notionWorkspaces: NotionWorkspace[];
   materials: Material[];
   personalEvents: PersonalEvent[];
   notes: Note[];
@@ -89,8 +86,6 @@ interface AppStore {
     schedules: Array<{ weekday: Weekday; startTime: string; endTime: string }>,
   ) => void;
   deleteCourse: (id: string) => void;
-  updateNotionUrl: (courseId: string, url: string | null) => void;
-  upsertWorkspace: (ws: Omit<NotionWorkspace, "id">) => void;
 
   // --- tareas ---
   addTask: (task: Omit<Task, "id" | "createdAt">) => void;
@@ -206,7 +201,6 @@ setTheme: (theme) => set({ theme }),
           classroomId: draft.classroomId,
           color: draft.color,
           credits: draft.credits,
-          notionUrl: draft.notionUrl ?? null,
         };
         const schedules: CourseSchedule[] = draft.schedules.map((s) => ({
           id: uid("sch"),
@@ -244,44 +238,8 @@ setTheme: (theme) => set({ theme }),
           tasks: s.tasks.filter((x) => x.courseId !== id),
           assessments: s.assessments.filter((x) => x.courseId !== id),
           grades: s.grades.filter((x) => x.courseId !== id),
-          notionWorkspaces: s.notionWorkspaces.filter((x) => x.courseId !== id),
           materials: s.materials.filter((x) => x.courseId !== id),
         })),
-
-      updateNotionUrl: (courseId, url) =>
-        set((s) => ({
-          courses: s.courses.map((c) => (c.id === courseId ? { ...c, notionUrl: url } : c)),
-          notionWorkspaces: url
-            ? s.notionWorkspaces.some((w) => w.courseId === courseId)
-              ? s.notionWorkspaces.map((w) =>
-                  w.courseId === courseId ? { ...w, pageUrl: url } : w,
-                )
-              : [
-                  ...s.notionWorkspaces,
-                  {
-                    id: uid("nw"),
-                    courseId,
-                    title: `Apuntes — ${s.courses.find((c) => c.id === courseId)?.name ?? ""}`.trim(),
-                    pageUrl: url,
-                    integration: "manual",
-                    lastSyncedAt: null,
-                  },
-                ]
-            : s.notionWorkspaces,
-        })),
-
-      upsertWorkspace: (ws) =>
-        set((s) => {
-          const exists = s.notionWorkspaces.some((w) => w.courseId === ws.courseId);
-          if (exists) {
-            return {
-              notionWorkspaces: s.notionWorkspaces.map((w) =>
-                w.courseId === ws.courseId ? { ...w, ...ws, id: w.id } : w,
-              ),
-            };
-          }
-          return { notionWorkspaces: [...s.notionWorkspaces, { ...ws, id: uid("nw") }] };
-        }),
 
       addTask: (task) =>
         set((s) => ({
@@ -488,7 +446,6 @@ setTheme: (theme) => set({ theme }),
         assessments: s.assessments,
         grades: s.grades,
         notifications: s.notifications,
-        notionWorkspaces: s.notionWorkspaces,
         materials: s.materials,
         personalEvents: s.personalEvents,
         notes: s.notes,

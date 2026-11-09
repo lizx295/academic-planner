@@ -112,7 +112,6 @@ export function applyMoodleSync(
         classroomId: "",
         color: PALETTE[index % PALETTE.length],
         credits: 0,
-        notionUrl: null,
         source: "aulavirtual",
       };
       courses.push(local);

@@ -16,7 +16,6 @@ function needsSsl(url: string): boolean | { rejectUnauthorized: boolean } {
   const isLocal =
     url.includes("localhost") ||
     url.includes("127.0.0.1") ||
-    /@db[:/]/.test(url) || // servicio "db" de docker compose
     url.startsWith("postgres://planner:");
   return isLocal ? false : true;
 }
@@ -25,7 +24,7 @@ function createClient(): Sql {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL no está configurada. Copia .env.example a .env.local o levanta `docker compose up db`.",
+      "DATABASE_URL no está configurada. Copia .env.example a .env.local y apunta a tu PostgreSQL (Supabase, Neon o local).",
     );
   }
   return postgres(url, {

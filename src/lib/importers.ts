@@ -4,7 +4,6 @@ import type {
   AttendanceRecord,
   Course,
   Material,
-  NotionWorkspace,
   PersonalEvent,
   Semester,
   Task,
@@ -31,7 +30,6 @@ export interface SeedFragment {
   assessments?: import("@/types").Assessment[];
   grades?: import("@/types").Grade[];
   materials?: Material[];
-  notionWorkspaces?: NotionWorkspace[];
   personalEvents?: PersonalEvent[];
   attendance?: AttendanceRecord[];
 }
@@ -264,7 +262,6 @@ export function parseSeedJSON(text: string, fileName: string): ParsedImport {
     "assessments",
     "grades",
     "materials",
-    "notionWorkspaces",
     "personalEvents",
     "attendance",
   ];

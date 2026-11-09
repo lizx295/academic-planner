@@ -6,6 +6,7 @@ import { useSession } from "@/components/auth/session";
 import { emptyData } from "@/lib/seed";
 import { useAppStore } from "@/store/app";
 import { useCloudStore } from "@/store/cloud";
+import { stripLegacyData } from "@/server/snapshot-client";
 import type { AppData } from "@/lib/seed";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -24,7 +25,6 @@ const DATA_KEYS = [
   "assessments",
   "grades",
   "notifications",
-  "notionWorkspaces",
   "materials",
   "personalEvents",
   "notes",
@@ -37,7 +37,7 @@ function dataOf(): Record<string, unknown> {
   const state = useAppStore.getState() as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = {};
   for (const key of DATA_KEYS) out[key] = state[key];
-  return out;
+  return stripLegacyData(out);
 }
 
 function fullData(raw: Record<string, unknown> | null | undefined): AppData {
@@ -47,7 +47,7 @@ function fullData(raw: Record<string, unknown> | null | undefined): AppData {
   for (const key of DATA_KEYS) {
     if (raw[key] !== undefined && raw[key] !== null) out[key] = raw[key];
   }
-  return out as unknown as AppData;
+  return stripLegacyData(out) as unknown as AppData;
 }
 
 function metaKey(userId: string): string {

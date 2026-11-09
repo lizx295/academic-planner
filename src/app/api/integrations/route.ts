@@ -11,7 +11,7 @@ export async function GET(): Promise<Response> {
   return guard(async () => {
     await ensureReady();
     const user = await requireUser();
-    const providers: Provider[] = ["notion", "aulavirtual"];
+    const providers: Provider[] = ["aulavirtual"];
     const out: Record<string, unknown> = {};
 
     for (const provider of providers) {
@@ -24,20 +24,10 @@ export async function GET(): Promise<Response> {
       if (row.config_enc) {
         try {
           const config = decryptJson<Record<string, unknown>>(row.config_enc);
-          if (provider === "notion") {
-            summary = {
-              workspaceName: config.workspaceName ?? "Notion",
-              botName: config.botName ?? "",
-              parentPageId: config.parentPageId ?? "",
-              tasksDbId: config.tasksDbId ?? "",
-              notesDbId: config.notesDbId ?? "",
-            };
-          } else {
-            summary = {
-              username: config.username ?? "",
-              siteName: config.siteName ?? "Aula Virtual ESPOL",
-            };
-          }
+          summary = {
+            username: config.username ?? "",
+            siteName: config.siteName ?? "Aula Virtual ESPOL",
+          };
         } catch {
           summary = { error: "No se pudo descifrar la configuración." };
         }

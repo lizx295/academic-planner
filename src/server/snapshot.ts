@@ -118,6 +118,24 @@ export async function mutateSnapshot<T>(
   });
 }
 
+/**
+ * Elimina restos de la integración con Notion, retirada de la app. Se aplica
+ * al leer y escribir el documento para que los datos antiguos se limpien solos.
+ */
+export function stripLegacyData(data: SnapshotData): SnapshotData {
+  const out: SnapshotData = { ...data };
+  delete out.notionWorkspaces;
+  if (Array.isArray(out.courses)) {
+    out.courses = (out.courses as Array<Record<string, unknown>>).map((course) => {
+      if (!course || typeof course !== "object" || !("notionUrl" in course)) return course;
+      const copy = { ...course };
+      delete copy.notionUrl;
+      return copy;
+    });
+  }
+  return out;
+}
+
 const ARRAY_KEYS = [
   "semesters",
   "semesterDays",
@@ -130,7 +148,6 @@ const ARRAY_KEYS = [
   "assessments",
   "grades",
   "notifications",
-  "notionWorkspaces",
   "materials",
   "personalEvents",
   "notes",
@@ -173,7 +190,7 @@ export function mergeSnapshots(
 
   if (!out.activeSemesterId && server.activeSemesterId) out.activeSemesterId = server.activeSemesterId;
   if (!out.theme && server.theme) out.theme = server.theme;
-  return out;
+  return stripLegacyData(out);
 }
 
 export function assertSnapshotShape(data: unknown): SnapshotData {

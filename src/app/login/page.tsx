@@ -346,7 +346,7 @@ function LoginScreen() {
               en un solo lugar.
             </h1>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-text-muted">
-              Materias, horarios, faltas, tareas, notas de Notion y tu Aula Virtual de ESPOL,
+              Materias, horarios, faltas, tareas, notas y tu Aula Virtual de ESPOL,
               sincronizados entre tu laptop y tu teléfono.
             </p>
           </div>
