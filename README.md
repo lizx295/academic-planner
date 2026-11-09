@@ -113,10 +113,13 @@ Con esto la app queda encendida 24/7 sin depender de tu computadora.
    `DATABASE_SSL=no-verify`.
 3. Sube el repositorio a GitHub e impórtalo en [Vercel](https://vercel.com).
 4. Define las variables de entorno del punto 3 en Vercel.
-5. Despliega. `vercel.json` ya programa el cron de recordatorios cada 15
-   minutos (`/api/cron/reminders`). Vercel envía `CRON_SECRET` como
-   `Authorization: Bearer …`; si tu plan no permite cron, puedes llamar al
-   endpoint desde un servicio externo.
+5. Despliega. `vercel.json` programa un cron diario de recordatorios
+   (`/api/cron/reminders`) como respaldo. En el plan **Hobby** Vercel solo
+   permite cron una vez al día; para recordatorios cada 15 minutos el repo
+   incluye `.github/workflows/reminders.yml`. Actívalo en GitHub:
+   *Settings → Secrets and variables → Actions* y crea:
+   - `APP_URL` = `https://tu-app.vercel.app`
+   - `CRON_SECRET` = el mismo valor configurado en Vercel
 6. Abre la URL en el teléfono y usa **Añadir a pantalla de inicio** (iOS) o
    **Instalar aplicación** (Android).
 
